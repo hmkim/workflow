@@ -86,13 +86,13 @@ process fastqc {
      maxRetries 3
      maxErrors '-1'
      
-     publishDir "${params.outdir}/fastqc"
+     publishDir "${params.outdir}/fastqc", mode: 'copy'
      
      input:
      set val(prefix), file(reads:'*') from read_files_fastqc
      
      output:
-     file { '*_fastqc.{zip,html}' } into fastqc_results
+     file '*_fastqc.{zip,html}' into fastqc_results
      
      """
      fastqc $reads
@@ -133,7 +133,7 @@ process qualimap {
 	set val(prefix), file(reads:"${prefix}.bam"), file (index:"${prefix}.bam.bai") from bamFilesForQualimap
 
 	output:
-	set file ( "${prefix}_stats/genome_results.txt" ) into qualimap_genome_results mode flatten
+	set file ( "${prefix}_stats/genome_results.txt" ) into qualimap_genome_results 
 	set file ( "${prefix}_stats/raw_data_qualimapReport/*.txt" ) into qualimap_report_txts
 	
 	"""
@@ -141,18 +141,25 @@ process qualimap {
 	"""
 }
 
-
+Channel
+	.fromPath(qualimap_genome_results, type: 'dir')
+	.subscribe { println "value: $it\n" }
 
 process multiqc{
-	echo true
+	memory '4GB'
+	time '4h'
 
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+
+	errorStrategy 'ignore'
+     
 	input:
-	file('*') from qualimap_genome_results.toSortedList()
-	set file ('fastqc/*') from fastqc_results.toList()
-	set file ("qualimap/raw_data_qualimapReport/*") from qualimap_report_txts.toList()
+	file ('qualimap/*') from qualimap_genome_results.toList()
+	file ('fastqc/*') from fastqc_results.toList()
+	file ("qualimap/raw_data_qualimapReport/*") from qualimap_report_txts.toList()
 
 	"""
-	echo "dd:ddd"
+	echo "dd:"
 	"""
 }
 
