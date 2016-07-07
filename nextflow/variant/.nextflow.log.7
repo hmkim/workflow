@@ -1,0 +1,43 @@
+Jul-06 00:32:37.066 [main] DEBUG nextflow.cli.Launcher - $> /BiO/BioTools/nextflow/nextflow run main.nf
+Jul-06 00:32:37.191 [main] INFO  nextflow.cli.CmdRun - N E X T F L O W  ~  version 0.20.1
+Jul-06 00:32:37.192 [main] INFO  nextflow.cli.CmdRun - Launching main.nf
+Jul-06 00:32:37.630 [main] DEBUG nextflow.Session - Session uuid: d4f11e76-9597-424e-9d0a-0ea08603d717
+Jul-06 00:32:37.634 [main] DEBUG nextflow.Session - Executor pool size: 128
+Jul-06 00:32:37.652 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 0.20.1 build 3853
+  Modified: 18-06-2016 07:00 UTC (16:00 KDT)
+  System: Linux 3.11.0-15-generic
+  Runtime: Groovy 2.4.7 on OpenJDK 64-Bit Server VM 1.8.0_45-b14
+  Encoding: UTF-8 (UTF-8)
+  Process: 103246@lion [203.239.28.32]
+
+Jul-06 00:32:37.661 [main] DEBUG nextflow.Session - Script base path does not exist or is not a directory: /BiO/BioPeople/brandon/workflow/nextflow/variant/bin
+Jul-06 00:32:37.661 [main] DEBUG nextflow.Session - Session start invoked
+Jul-06 00:32:37.668 [main] DEBUG nextflow.processor.TaskDispatcher - Dispatcher > start
+Jul-06 00:32:37.669 [main] DEBUG nextflow.script.ScriptRunner - > Script parsing
+Jul-06 00:32:37.830 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Jul-06 00:32:37.858 [main] DEBUG nextflow.Channel - files for syntax: glob; folder: /BiO/BioProjects/TBD160423-Cow-WES-2016-07/result/07-1_picard_dedup/; pattern: */*.dedup.bam; options: null
+Jul-06 00:32:37.989 [main] DEBUG nextflow.processor.ProcessFactory - << taskConfig executor: null
+Jul-06 00:32:37.989 [main] DEBUG nextflow.processor.ProcessFactory - >> processorType: 'local'
+Jul-06 00:32:37.998 [main] DEBUG nextflow.executor.Executor - Initializing executor: local
+Jul-06 00:32:38.000 [main] INFO  nextflow.executor.Executor - [warm up] executor > local
+Jul-06 00:32:38.010 [main] DEBUG n.processor.LocalPollingMonitor - Creating local task monitor for executor 'local' > cpus: 128; memory: 503.7 GB; pollInterval: 100ms; dumpInterval: 5m
+Jul-06 00:32:38.015 [main] DEBUG nextflow.processor.TaskDispatcher - Starting monitor: LocalPollingMonitor
+Jul-06 00:32:38.016 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: local)
+Jul-06 00:32:38.018 [main] DEBUG nextflow.executor.Executor - Invoke register for executor: local
+Jul-06 00:32:38.090 [main] DEBUG nextflow.Session - >>> barrier register (process: samtools_variant_call)
+Jul-06 00:32:38.112 [main] DEBUG n.processor.ParallelTaskProcessor - Creating operator > samtools_variant_call -- maxForks: 128
+Jul-06 00:32:38.136 [main] DEBUG nextflow.script.ScriptRunner - > Await termination 
+Jul-06 00:32:38.136 [main] DEBUG nextflow.Session - Session await
+Jul-06 00:32:38.156 [Actor Thread 1] DEBUG n.processor.ParallelTaskProcessor - <samtools_variant_call> Poison pill arrived
+Jul-06 00:32:38.163 [Actor Thread 2] DEBUG nextflow.processor.StateObj - <samtools_variant_call> State before poison: StateObj[submitted: 3; completed: 0; poisoned: false; allScalar: false]
+Jul-06 00:32:38.342 [Actor Thread 4] INFO  nextflow.Session - [04/a302ee] Submitted process > samtools_variant_call (1)
+Jul-06 00:32:38.342 [Actor Thread 3] INFO  nextflow.Session - [cb/cbd141] Submitted process > samtools_variant_call (2)
+Jul-06 00:32:38.342 [Actor Thread 5] INFO  nextflow.Session - [e5/45c12d] Submitted process > samtools_variant_call (3)
+Jul-06 00:32:38.618 [Actor Thread 2] DEBUG nextflow.processor.TaskProcessor - <samtools_variant_call> Sending poison pills and terminating process
+Jul-06 00:32:38.621 [Actor Thread 2] DEBUG nextflow.Session - <<< barrier arrive (process: samtools_variant_call)
+Jul-06 00:32:38.622 [main] DEBUG nextflow.Session - Session await > processes completed
+Jul-06 00:32:38.623 [Actor Thread 5] DEBUG n.processor.ParallelTaskProcessor - <samtools_variant_call> After stop
+Jul-06 00:32:38.718 [Thread-3] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: local)
+Jul-06 00:32:38.718 [main] DEBUG nextflow.Session - Session await > done
+Jul-06 00:32:38.734 [main] DEBUG nextflow.Session - Session destroyed

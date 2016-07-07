@@ -1,0 +1,35 @@
+Jul-06 00:38:18.059 [main] DEBUG nextflow.cli.Launcher - $> /BiO/BioTools/nextflow/nextflow run main.nf
+Jul-06 00:38:18.150 [main] INFO  nextflow.cli.CmdRun - N E X T F L O W  ~  version 0.20.1
+Jul-06 00:38:18.151 [main] INFO  nextflow.cli.CmdRun - Launching main.nf
+Jul-06 00:38:18.586 [main] DEBUG nextflow.Session - Session uuid: 5f2fe99d-83d7-41b2-bcf8-d70387dec2db
+Jul-06 00:38:18.590 [main] DEBUG nextflow.Session - Executor pool size: 128
+Jul-06 00:38:18.608 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 0.20.1 build 3853
+  Modified: 18-06-2016 07:00 UTC (16:00 KDT)
+  System: Linux 3.11.0-15-generic
+  Runtime: Groovy 2.4.7 on OpenJDK 64-Bit Server VM 1.8.0_45-b14
+  Encoding: UTF-8 (UTF-8)
+  Process: 109268@lion [203.239.28.32]
+
+Jul-06 00:38:18.617 [main] DEBUG nextflow.Session - Script base path does not exist or is not a directory: /BiO/BioPeople/brandon/workflow/nextflow/variant/bin
+Jul-06 00:38:18.618 [main] DEBUG nextflow.Session - Session start invoked
+Jul-06 00:38:18.625 [main] DEBUG nextflow.processor.TaskDispatcher - Dispatcher > start
+Jul-06 00:38:18.626 [main] DEBUG nextflow.script.ScriptRunner - > Script parsing
+Jul-06 00:38:18.790 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Jul-06 00:38:18.816 [main] DEBUG nextflow.Channel - files for syntax: glob; folder: /BiO/BioProjects/TBD160423-Cow-WES-2016-07/result/07-1_picard_dedup/; pattern: */*.dedup.bam; options: null
+Jul-06 00:38:18.932 [main] DEBUG nextflow.Session - Session aborted -- Cause: groovy.lang.MissingMethodException: No signature of method: groovyx.gpars.dataflow.DataflowQueue.minus() is applicable for argument types: (java.lang.String) values: [.bam]
+Possible solutions: min(), min(groovy.lang.Closure), min(java.util.Comparator), find(), unique(), count()
+Jul-06 00:38:19.045 [main] ERROR nextflow.cli.Launcher - @unknown
+groovy.lang.MissingMethodException: No signature of method: groovyx.gpars.dataflow.DataflowQueue.minus() is applicable for argument types: (java.lang.String) values: [.bam]
+Possible solutions: min(), min(groovy.lang.Closure), min(java.util.Comparator), find(), unique(), count()
+	at org.codehaus.groovy.runtime.ScriptBytecodeAdapter.unwrap(ScriptBytecodeAdapter.java:58)
+	at org.codehaus.groovy.runtime.callsite.PojoMetaClassSite.call(PojoMetaClassSite.java:49)
+	at org.codehaus.groovy.runtime.callsite.CallSiteArray.defaultCall(CallSiteArray.java:48)
+	at org.codehaus.groovy.runtime.callsite.AbstractCallSite.call(AbstractCallSite.java:113)
+	at org.codehaus.groovy.runtime.callsite.AbstractCallSite.call(AbstractCallSite.java:125)
+	at _nf_script_9e01d5c8.run(_nf_script_9e01d5c8:10)
+	at nextflow.script.ScriptRunner.run(ScriptRunner.groovy:322)
+	at nextflow.script.ScriptRunner.execute(ScriptRunner.groovy:156)
+	at nextflow.cli.CmdRun.run(CmdRun.groovy:198)
+	at nextflow.cli.Launcher.run(Launcher.groovy:385)
+	at nextflow.cli.Launcher.main(Launcher.groovy:534)
