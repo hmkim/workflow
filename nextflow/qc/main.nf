@@ -133,33 +133,35 @@ process qualimap {
 	set val(prefix), file(reads:"${prefix}.bam"), file (index:"${prefix}.bam.bai") from bamFilesForQualimap
 
 	output:
-	set file ( "${prefix}_stats/genome_results.txt" ) into qualimap_genome_results 
-	set file ( "${prefix}_stats/raw_data_qualimapReport/*.txt" ) into qualimap_report_txts
+	file ( "${prefix}_stats/genome_results.txt" ) into qualimap_genome_results 
+	file ( "${prefix}_stats/raw_data_qualimapReport/*.txt" ) into qualimap_report_txts
 	
 	"""
 	qualimap bamqc -bam $reads -c -gd HUMAN -nt ${task.cpus}
 	"""
 }
 
-Channel
-	.fromPath(qualimap_genome_results, type: 'dir')
-	.subscribe { println "value: $it\n" }
+qualimap_genome_results.into { test; test2; }
 
-process multiqc{
+process multiqc_prepare{
 	memory '4GB'
 	time '4h'
 
 	publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
+	echo true
+
 	errorStrategy 'ignore'
      
 	input:
-	file ('qualimap/*') from qualimap_genome_results.toList()
-	file ('fastqc/*') from fastqc_results.toList()
-	file ("qualimap/raw_data_qualimapReport/*") from qualimap_report_txts.toList()
+	set val(prefix), file(txt:"qualimap/$prefix/genome_results.txt") from test2.map{
+		file -> tuple(file.toRealPath().getParent().getName().minus("_stats"), file)
+	}
+	set file ('fastqc/*') from fastqc_results.toList()
+	file ("qualimap/$prefix/raw_data_qualimapReport/*") from qualimap_report_txts
 
 	"""
-	echo "dd:"
+	echo "$prefix\t$txt\n"
 	"""
 }
 
