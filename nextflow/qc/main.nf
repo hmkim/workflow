@@ -114,7 +114,7 @@ process mapping {
     set prefix, file { "${prefix}.bam" }, file { "${prefix}.bam.bai" } into bamFiles
 
     """
-    bwa mem -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | samblaster | samtools view -u -Sb - | samtools sort - -o ${prefix}.bam
+    bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | samblaster | samtools view -u -Sb - | samtools sort - -o ${prefix}.bam
     samtools index ${prefix}.bam
     """
 }
