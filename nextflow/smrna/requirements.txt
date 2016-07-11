@@ -1,0 +1,6 @@
+# This file may be used to create an environment using:
+# $ conda create --name wgs -c bioconda --file <this file>
+fastqc=0.11.5
+trim-galore=0.4.1
+bcbio-nextgen=0.9.9a0
+sambamba=0.6.3
