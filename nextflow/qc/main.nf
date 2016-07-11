@@ -27,8 +27,10 @@ params.gtf = ''
 params.rlocation = ''
 
 params.name = "QC Best practice"
-params.reads = '/BiO/BioProjects/QCsystem/rawreads/TBD160338-test/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
-params.outdir = '/BiO/BioPeople/brandon/test_nextflow/qc/outdir-test'
+//params.reads = '/BiO/BioProjects/QCsystem/rawreads/TBD160338-test/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
+//params.outdir = '/BiO/BioPeople/brandon/test_nextflow/qc/outdir-test'
+params.reads = '/BiO/BioProjects/QCsystem/rawreads/160614_D00236_0448_AC9VP7ANXX/Unaligned/TBD160338/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
+params.outdir = '/BiO/BioPeople/brandon/test_nextflow/qc/outdir'
 
 log.info "===================================="
 log.info " QC Best Practice v${version}"
@@ -141,27 +143,36 @@ process qualimap {
 	"""
 }
 
-qualimap_genome_results.into { test; test2; }
 
-process multiqc_prepare{
-	memory '4GB'
-	time '4h'
+//process multiqc_prepare{
+//	input:
+//	set val(prefix), file(txt:"qualimap/$prefix/genome_results.txt") from test2.map{
+//		file -> tuple(file.toRealPath().getParent().getName().minus("_stats"), file)
+//	}
+//	//set file ('fastqc/*') from fastqc_results.toList()
+//	file ("qualimap/$prefix/raw_data_qualimapReport/*") from qualimap_report_txts
+//
+//	output:
+//	set val(params.outdir) into multiqc_targetDir
+//
+//	"""
+//	echo "$prefix\t$txt\n"
+//	"""
+//}
 
-	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+process multiqc{
+	publishDir "${params.outdir}/multiqc", mode: 'copy'
 
-	echo true
-
-	errorStrategy 'ignore'
-     
 	input:
-	set val(prefix), file(txt:"qualimap/$prefix/genome_results.txt") from test2.map{
-		file -> tuple(file.toRealPath().getParent().getName().minus("_stats"), file)
-	}
-	set file ('fastqc/*') from fastqc_results.toList()
-	file ("qualimap/$prefix/raw_data_qualimapReport/*") from qualimap_report_txts
+	val input_files from qualimap_genome_results.toList()
+	file('*') from qualimap_report_txts.toList()
+	file('*') from fastqc_results.toList()
+
+	output:
+	file ('multiqc_*') into multiqc_output
 
 	"""
-	echo "$prefix\t$txt\n"
+	multiqc ${params.outdir}
 	"""
 }
 

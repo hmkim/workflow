@@ -240,7 +240,7 @@ process variant_call_UG{
 	set file('*') from baseRecal_table_forUG
 
 	output:
-	set file('output-ug.vcf.gz*') into variant_UG
+	set val(prefix), file('output-ug.vcf.gz*') into variant_UG
 
 	"""
 	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam -q recal_data.table --algo Genotyper -d ${params.dbsnp} --var_type both --emit_conf=10 --call_conf=30 output-ug.vcf.gz
@@ -258,7 +258,7 @@ process variant_call_HC{
 	set file('*') from baseRecal_table_forHC
 
 	output:
-	set file('output-hc.vcf.gz*') into variant_HC
+	set val(prefix), file('output-hc.vcf.gz*') into variant_HC
 
 	"""
 	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam -q recal_data.table --algo Haplotyper -d ${params.dbsnp} --emit_conf=10 --call_conf=30 --prune_factor=3 output-hc.vcf.gz
@@ -268,6 +268,37 @@ process variant_call_HC{
 /*
  * Step 7. Variant annotation
  */
+process snpeff_for_UG{
+	publishDir "${params.outdir}/$prefix/variant_UG"
+
+	input:
+	set val(prefix), file(vcf:'*') from variant_UG
+
+	output:
+	file 'output-ug.eff.vcf' into ug_eff_vcf
+	file 'snpEff_summary.*' into ug_eff_summary
+
+	"""
+	/BiO/BioTools/miniconda2/bin/java -Xmx8g -jar /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.jar eff -c /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.config -csvStats snpEff_summary.csv -htmlStats snpEff_summary.html GRCh37.75 output-ug.vcf.gz > output-ug.eff.vcf
+	"""
+}
+
+process snpeff_for_HC{
+	publishDir "${params.outdir}/$prefix/variant_HC"
+
+	input:
+	set val(prefix), file(vcf:'*') from variant_HC
+
+	output:
+	file 'output-hc.eff.vcf' into hc_eff_vcf
+	file 'snpEff_summary.*' into hc_eff_summary
+
+
+
+	"""
+	/BiO/BioTools/miniconda2/bin/java -Xmx8g -jar /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.jar eff -c /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.config -csvStats snpEff_summary.csv -htmlStats snpEff_summary.html GRCh37.75 output-hc.vcf.gz > output-hc.eff.vcf
+	"""
+}
 
 /*
  * Helper function, given a file Path
