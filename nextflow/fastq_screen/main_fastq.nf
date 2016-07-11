@@ -16,8 +16,6 @@ bam_files.into{ test1; test2; }
 
 
 process bam2fastq{
-	publishDir "${params.out_dir}/${prefix}" 
-
 	input:
 	set val(prefix), file(bam:'*') from test2
 
