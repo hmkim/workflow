@@ -63,8 +63,8 @@ process trim{
 	output:
 	set val(prefix), file('*_trimmed.*') into readTrimmed
 	file '*_trimming_report.txt' into trimgalore_results
-	
-	script:
+
+	script:	
 	if ( params.adapter )
 		"""
 		trim_galore --adapter ${params.adapter} ${read}
