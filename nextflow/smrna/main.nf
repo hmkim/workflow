@@ -52,7 +52,7 @@ process runFastQC_original{
 	file '*_fastqc.zip' into fastqc_zip_original
 
 	"""
-	/BiO/BioTools/bcbio/data/anaconda/bin/fastqc -t ${params.fastqc.cpus} ${read}
+	fastqc -t ${params.fastqc.cpus} ${read}
 	"""
 }
 
@@ -65,16 +65,13 @@ process trim{
 	file '*_trimming_report.txt' into trimgalore_results
 	
 	script:
-	"""
-	export PATH=/BiO/BioTools/bcbio/data/anaconda/bin:$PATH
-	"""
 	if ( params.adapter )
 		"""
-		/BiO/BioTools/trim_galore/0.4.1/trim_galore --adapter ${params.adapter} ${read}
+		trim_galore --adapter ${params.adapter} ${read}
 		"""
 	else
 		"""
-		/BiO/BioTools/trim_galore/0.4.1/trim_galore ${read}
+		trim_galore ${read}
 		"""
 }
 /*
@@ -94,7 +91,7 @@ process runFastQC_trimmed {
 	file '*_fastqc.zip' into fastqc_zip_trimmed
 
 	"""
-	/BiO/BioTools/bcbio/data/anaconda/bin/fastqc -t ${params.fastqc.cpus} ${read}
+	fastqc -t ${params.fastqc.cpus} ${read}
 	"""
 	}
 
@@ -204,7 +201,7 @@ process mapping{
 
 	"""
 	/BiO/BioTools/bcbio/data/anaconda/bin/STAR --genomeDir $params.db_star --readFilesIn $read --runThreadN ${params.star.cpus} --outFileNamePrefix ./ --outReadsUnmapped Fastx --outFilterMultimapNmax 1000 --outStd SAM --alignIntronMax 1 --outSAMunmapped Within --outSAMattributes NH HI NM MD AS  --sjdbGTFfile $params.gtf_ref_transcripts --sjdbOverhang 39  --outSAMattrRGline ID:miRQC_A PL:illumina PU:1_2016-04-08_mir2qc_bcbio SM:miRQC_A | /BiO/BioTools/bcbio/data/galaxy/../anaconda/bin/samtools sort -@ 1 -m 16G -o seqs.bam /dev/stdin
-	/BiO/BioTools/bcbio/data/anaconda/bin/sambamba index -t ${params.sambamba.cpus} seqs.bam
+	sambamba index -t ${params.sambamba.cpus} seqs.bam
 	"""
 
 }
