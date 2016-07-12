@@ -1,6 +1,8 @@
 # This file may be used to create an environment using:
 # $ conda create --name qc -c bioconda --file <this file>
-qualimap
-fastqc
-bwa
-sambamba
+qualimap=2.2
+fastqc=0.11.5
+bwa=0.7.15
+sambamba=0.6.3
+multiqc=0.7
+samblaster=0.1.22

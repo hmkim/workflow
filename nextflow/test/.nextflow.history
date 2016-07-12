@@ -1,0 +1,1 @@
+07d152c1-8e00-49c5-9f67-bfd327168eff	nextflow run config-vars.nf -c config-vars.config

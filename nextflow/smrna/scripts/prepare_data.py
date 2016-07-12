@@ -4,7 +4,6 @@ import sys, os
 import shutil
 from collections import namedtuple
 
-sys.path.append('/BiO/BioTools/bcbio/data/anaconda/lib/python2.7/site-packages')
 from seqcluster.prepare_data import _read_fastq_files, _create_matrix_uniq_seq
 
 filelist = sys.argv[1]

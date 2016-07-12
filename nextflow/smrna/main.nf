@@ -6,23 +6,12 @@
 
 // Pipeline version
 version = 0.1
-
-params.reads = '/BiO/BioPeople/brandon/test_nextflow/smrna/test_data/SRR95089{2,3}.fastq.gz'
-params.adapter = 'TGGAATTCTCGGGTGC'
-params.trna_mature_pre = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/hg19/srnaseq/trna_mature_pre.fa'
-params.db_srnaseq = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/hg19/srnaseq'
-params.db_star = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/hg19/star'
-params.ref_fasta = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/hg19/seq/hg19.fa'
-params.mature_fa = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/hg19/srnaseq/mature.fa'
-params.hairpin_fa = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/hg19/srnaseq/hairpin.fa' 
-params.species = 'hsa'
-params.Rfam_for_miRDeep = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/hg19/srnaseq/Rfam_for_miRDeep.fa'
-params.gtf_ref_transcripts = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/hg19/rnaseq/ref-transcripts.gtf'
-
-params.script_dir = '/BiO/BioPeople/brandon/test_nextflow/smrna/scripts'
  
 log.info "===================================="
 log.info " Small RNA Sequencing Best Practice v${version}"
+log.info " Read: ${params.reads}"
+log.info " Adapter: ${params.adapter}"
+log.info " Result directory: ${params.outdir}"
 log.info "===================================="
 
 /*
@@ -42,8 +31,11 @@ Channel
 read_files.into { read_files_fastqc; read_files_trimming; }
 
 process runFastQC_original{
+	beforeScript 'set +u; source activate smrna; set -u'
 	cpus params.fastqc.cpus
-	
+
+	publishDir "${params.outdir}/fastqc";
+
 	input:
 	set val(prefix),  file(read) from read_files_fastqc
 
@@ -57,6 +49,10 @@ process runFastQC_original{
 }
 
 process trim{
+	beforeScript 'set +u; source activate smrna; set -u'
+	
+	publishDir "${params.outdir}/trim";
+
 	input:
 	set val(prefix), file(read) from read_files_trimming
 
@@ -74,14 +70,14 @@ process trim{
 		trim_galore ${read}
 		"""
 }
-/*
-* /BiO/BioTools/bcbio/data/anaconda/bin/cutadapt --adapter=${params.adapter} --minimum-length=8 --untrimmed-output=\${NAMEBASE}-untrimmed-output -o \${NAMEBASE}-clean.fastq.gz -m 17 --overlap=8 ${read} --too-short-output \${NAMEBASE}.short.fastq.gz
-*/
 
 readTrimmed.into { readTrimmed_fastqc; readTrimmed_TdrMapping; readTrimmed_collapse; }
 
 process runFastQC_trimmed {
+	beforeScript 'set +u; source activate smrna; set -u'
 	cpus params.fastqc.cpus
+	
+	publishDir "${params.outdir}/fastqc_trimmed";
 
 	input:
 	set val(prefix), file(read) from readTrimmed_fastqc
@@ -96,6 +92,8 @@ process runFastQC_trimmed {
 	}
 
 process collapseRead{
+	beforeScript 'set +u; source activate smrna; set -u'
+
 	input:
 	set val(prefix), file(read) from readTrimmed_collapse
 
@@ -104,12 +102,14 @@ process collapseRead{
 	file('*_trimmed.fastq') into collapsedRead_files
 
 	"""
-	/BiO/BioTools/bcbio/data/anaconda/bin/python ${params.script_dir}/collapse.py ${read}
+	python ${params.script_dir}/collapse.py ${read}
 	"""
 }
 
 /* https://github.com/sararselitsky/tDRmapper */
 process TdrMapping{
+	publishDir "${params.outdir}/TdrMapping";
+
 	input:
 	set val(prefix), file(read) from readTrimmed_TdrMapping
 
@@ -138,11 +138,13 @@ process miraligner{
 	"""
 	export PATH=/BiO/BioTools/bcbio/data/anaconda/bin:\$PATH
 	/BiO/BioTools/bcbio/data/anaconda/bin/miraligner -Xms705m -Xmx4500m -sub 1 -trim 3 -add 3 -s ${params.species} -i ${read} -db ${params.db_srnaseq} -o sample
-	/BiO/BioTools/bcbio/data/anaconda/bin/python ${params.script_dir}/miraligner_parser.py sample.mirna sample.bak sample
+	python ${params.script_dir}/miraligner_parser.py sample.mirna sample.bak sample
 	"""
 }
 
 process seqcluster_prepare_makeList{
+	beforeScript 'set +u; source activate smrna; set -u'
+
 	input:
 	val(prefix) from crp_prepare_makeList.toList()
 	file(read) from crf_prepare_makeList.toList()
@@ -171,6 +173,10 @@ process seqcluster_prepare_makeList{
 }
 
 process seqcluster_prepare{
+	beforeScript 'set +u; source activate smrna; set -u'
+
+	publishDir "${params.outdir}/seqcluster";
+
 	input:
 	file filelist from prepare_filelist
 	val(prefix) from crp_prepare.toList()
@@ -188,6 +194,8 @@ process seqcluster_prepare{
 seqs_ma.into { mirdeep2_seqs_ma; seqcluster_cluster_seqs_ma; }
 
 process mapping{
+	beforeScript 'set +u; source activate smrna; set -u'
+
 	cpus params.sambamba.cpus
 	cpus params.star.cpus
 
@@ -207,14 +215,18 @@ process mapping{
 }
 
 process mirdeep2{
+	beforeScript 'set +u; source activate smrna; set -u'
+
+	publishDir "${params.outdir}/mirdeep2";
+
 	input:
 	set file(seqs_ma) from mirdeep2_seqs_ma
 	set file(bam) from star_bam
 	set file(bai) from star_bam_index
 
 	"""
-	/BiO/BioTools/bcbio/data/anaconda/bin/python ${params.script_dir}/mirdeep_prepare.py ${bam} ${seqs_ma}
+	python ${params.script_dir}/mirdeep_prepare.py ${bam} ${seqs_ma}
 	unset PERL5LIB && export PATH=/BiO/BioTools/bcbio/data/anaconda/bin:$PATH && perl /BiO/BioTools/bcbio/data/anaconda/bin/miRDeep2.pl file_reads.fa ${params.ref_fasta} align.bam ${params.mature_fa} none ${params.hairpin_fa} -f ${params.Rfam_for_miRDeep} -r simple -c -P -t ${params.species} -z res
-	/BiO/BioTools/bcbio/data/anaconda/bin/python ${params.script_dir}/mirdeep_parse_novel.py result_res.csv ${params.species}
+	python ${params.script_dir}/mirdeep_parse_novel.py result_res.csv ${params.species}
 	"""
 }

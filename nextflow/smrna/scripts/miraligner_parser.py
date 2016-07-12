@@ -5,8 +5,6 @@ import sys
 import os.path as op
 
 
-sys.path.append('/BiO/BioTools/bcbio/data/anaconda/lib/python2.7/site-packages')
-
 try:
     from seqcluster import prepare_data as prepare
     from seqcluster import templates as template_seqcluster

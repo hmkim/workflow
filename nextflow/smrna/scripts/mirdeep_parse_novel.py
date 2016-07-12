@@ -4,7 +4,6 @@ import os.path as op
 
 import pysam
 
-sys.path.append('/BiO/BioTools/bcbio/data/anaconda/lib/python2.7/site-packages/bcbio')
 from bcbio.log import logger
 from bcbio.utils import file_exists, safe_makedir, chdir, get_perl_exports
 from bcbio.provenance import do

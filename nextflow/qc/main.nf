@@ -76,46 +76,50 @@ read_files.into { read_files_fastqc; read_files_mapping; }
  */
 
 process fastqc {
-     tag "$prefix"
-     
-     memory { 2.GB * task.attempt }
-     time { 4.h * task.attempt }
-     
-     errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
-     maxRetries 3
-     maxErrors '-1'
-     
-     publishDir "${params.outdir}/fastqc", mode: 'copy'
-     
-     input:
-     set val(prefix), file(reads:'*') from read_files_fastqc
-     
-     output:
-     file '*_fastqc.{zip,html}' into fastqc_results
-     
-     """
-     fastqc $reads
-     """
+	beforeScript 'set +u; source activate qc; set -u'
+
+	tag "$prefix"
+
+	memory { 2.GB * task.attempt }
+	time { 4.h * task.attempt }
+
+	errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
+	maxRetries 3
+	maxErrors '-1'
+
+	publishDir "${params.outdir}/fastqc", mode: 'copy'
+
+	input:
+	set val(prefix), file(reads:'*') from read_files_fastqc
+
+	output:
+	file '*_fastqc.{zip,html}' into fastqc_results
+
+	"""
+	fastqc $reads
+	"""
 }
 
 /*
  * Step 2. Maps each read-pair by using mapper
  */
 process mapping {
-    tag "$prefix"
-    cpus 5
- 
-    input: 
-    set val(prefix), file (reads:'*') from read_files_mapping
+	beforeScript 'set +u; source activate qc; set -u'
 
-    output:
-    file { "${prefix}.bam*" } into bamFilesOut
-    set prefix, file { "${prefix}.bam" }, file { "${prefix}.bam.bai" } into bamFiles
+	tag "$prefix"
+	cpus 5
 
-    """
-    bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | samblaster | samtools view -u -Sb - | samtools sort - -o ${prefix}.bam
-    samtools index ${prefix}.bam
-    """
+	input: 
+	set val(prefix), file (reads:'*') from read_files_mapping
+
+	output:
+	file { "${prefix}.bam*" } into bamFilesOut
+	set prefix, file { "${prefix}.bam" }, file { "${prefix}.bam.bai" } into bamFiles
+
+	"""
+	bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | samblaster | samtools view -u -Sb - | samtools sort - -o ${prefix}.bam
+	samtools index ${prefix}.bam
+	"""
 }
 
 (bamFilesForCoverage,
@@ -123,6 +127,7 @@ process mapping {
  bamFilesForVariantCalling) = bamFiles.separate(3) { x -> [ x, x, x ] }
 
 process qualimap {
+	beforeScript 'set +u; source activate qc; set -u'
 	tag "$prefix"
 	cpus 8
 
@@ -140,24 +145,9 @@ process qualimap {
 	"""
 }
 
-
-//process multiqc_prepare{
-//	input:
-//	set val(prefix), file(txt:"qualimap/$prefix/genome_results.txt") from test2.map{
-//		file -> tuple(file.toRealPath().getParent().getName().minus("_stats"), file)
-//	}
-//	//set file ('fastqc/*') from fastqc_results.toList()
-//	file ("qualimap/$prefix/raw_data_qualimapReport/*") from qualimap_report_txts
-//
-//	output:
-//	set val(params.outdir) into multiqc_targetDir
-//
-//	"""
-//	echo "$prefix\t$txt\n"
-//	"""
-//}
-
 process multiqc{
+	beforeScript 'set +u; source activate qc; set -u'
+
 	publishDir "${params.outdir}/multiqc", mode: 'copy'
 
 	input:

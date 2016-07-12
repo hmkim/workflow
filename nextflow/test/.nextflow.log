@@ -1,0 +1,50 @@
+Jul-12 09:18:49.072 [main] DEBUG nextflow.cli.Launcher - $> /BiO/BioTools/nextflow/nextflow run config-vars.nf -c config-vars.config
+Jul-12 09:18:49.170 [main] INFO  nextflow.cli.CmdRun - N E X T F L O W  ~  version 0.20.1
+Jul-12 09:18:49.171 [main] INFO  nextflow.cli.CmdRun - Launching config-vars.nf
+Jul-12 09:18:49.197 [main] DEBUG nextflow.config.ConfigBuilder - User config file: config-vars.config
+Jul-12 09:18:49.199 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /BiO/BioPeople/brandon/workflow/nextflow/test/config-vars.config
+Jul-12 09:18:49.505 [main] DEBUG nextflow.config.ConfigBuilder - Setting config profile: 'standard'
+Jul-12 09:18:49.622 [main] DEBUG nextflow.Session - Session uuid: 07d152c1-8e00-49c5-9f67-bfd327168eff
+Jul-12 09:18:49.626 [main] DEBUG nextflow.Session - Executor pool size: 128
+Jul-12 09:18:49.642 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 0.20.1 build 3853
+  Modified: 18-06-2016 07:00 UTC (16:00 KDT)
+  System: Linux 3.19.0-58-generic
+  Runtime: Groovy 2.4.7 on OpenJDK 64-Bit Server VM 1.7.0_101-b00
+  Encoding: UTF-8 (UTF-8)
+  Process: 77432@bear0 [203.239.28.63]
+
+Jul-12 09:18:49.677 [main] DEBUG nextflow.Session - Script base path does not exist or is not a directory: /BiO/BioPeople/brandon/workflow/nextflow/test/bin
+Jul-12 09:18:49.678 [main] DEBUG nextflow.Session - Session start invoked
+Jul-12 09:18:49.680 [main] DEBUG nextflow.processor.TaskDispatcher - Dispatcher > start
+Jul-12 09:18:49.681 [main] DEBUG nextflow.script.ScriptRunner - > Script parsing
+Jul-12 09:18:49.838 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Jul-12 09:18:49.907 [main] DEBUG nextflow.processor.ProcessFactory - << taskConfig executor: null
+Jul-12 09:18:49.907 [main] DEBUG nextflow.processor.ProcessFactory - >> processorType: 'local'
+Jul-12 09:18:49.919 [main] DEBUG nextflow.executor.Executor - Initializing executor: local
+Jul-12 09:18:49.923 [main] INFO  nextflow.executor.Executor - [warm up] executor > local
+Jul-12 09:18:49.933 [main] DEBUG n.processor.LocalPollingMonitor - Creating local task monitor for executor 'local' > cpus: 128; memory: 503.8 GB; pollInterval: 100ms; dumpInterval: 5m
+Jul-12 09:18:49.940 [main] DEBUG nextflow.processor.TaskDispatcher - Starting monitor: LocalPollingMonitor
+Jul-12 09:18:49.941 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: local)
+Jul-12 09:18:49.944 [main] DEBUG nextflow.executor.Executor - Invoke register for executor: local
+Jul-12 09:18:50.044 [main] DEBUG nextflow.Session - >>> barrier register (process: foo)
+Jul-12 09:18:50.061 [main] DEBUG n.processor.ParallelTaskProcessor - Creating operator > foo -- maxForks: 128
+Jul-12 09:18:50.087 [main] DEBUG nextflow.processor.ProcessFactory - << taskConfig executor: null
+Jul-12 09:18:50.087 [main] DEBUG nextflow.processor.ProcessFactory - >> processorType: 'local'
+Jul-12 09:18:50.088 [main] DEBUG nextflow.executor.Executor - Initializing executor: local
+Jul-12 09:18:50.089 [main] DEBUG nextflow.Session - >>> barrier register (process: bar)
+Jul-12 09:18:50.098 [main] DEBUG n.processor.ParallelTaskProcessor - Creating operator > bar -- maxForks: 128
+Jul-12 09:18:50.100 [main] DEBUG nextflow.script.ScriptRunner - > Await termination 
+Jul-12 09:18:50.100 [main] DEBUG nextflow.Session - Session await
+Jul-12 09:18:50.416 [Actor Thread 5] INFO  nextflow.Session - [d5/ed2d31] Submitted process > foo (1)
+Jul-12 09:18:50.416 [Actor Thread 1] INFO  nextflow.Session - [c5/fd0fb5] Submitted process > bar (1)
+Jul-12 09:18:50.637 [Actor Thread 4] DEBUG nextflow.processor.TaskProcessor - <bar> Sending poison pills and terminating process
+Jul-12 09:18:50.644 [Actor Thread 3] DEBUG nextflow.processor.TaskProcessor - <foo> Sending poison pills and terminating process
+Jul-12 09:18:50.646 [Actor Thread 3] DEBUG nextflow.Session - <<< barrier arrive (process: foo)
+Jul-12 09:18:50.646 [Actor Thread 4] DEBUG nextflow.Session - <<< barrier arrive (process: bar)
+Jul-12 09:18:50.657 [main] DEBUG nextflow.Session - Session await > processes completed
+Jul-12 09:18:50.659 [Actor Thread 1] DEBUG n.processor.ParallelTaskProcessor - <foo> After stop
+Jul-12 09:18:50.659 [Actor Thread 5] DEBUG n.processor.ParallelTaskProcessor - <bar> After stop
+Jul-12 09:18:50.737 [Thread-2] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: local)
+Jul-12 09:18:50.737 [main] DEBUG nextflow.Session - Session await > done
+Jul-12 09:18:50.755 [main] DEBUG nextflow.Session - Session destroyed
