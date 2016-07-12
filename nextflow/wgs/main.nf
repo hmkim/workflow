@@ -21,6 +21,7 @@ params.known_sites = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/variation
 params.dbsnp = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/variation/dbsnp_138.vcf.gz'
 params.gtf = ''
 params.rlocation = ''
+params.gatk = "/BiO/BioTools/miniconda3/opt/gatk-3.6/GenomeAnalysisTK.jar" 
 
 params.name = "Best practice for WGS analysis"
 
@@ -95,24 +96,27 @@ process fastqc {
 }
 
 /*
- * Step 2. Maps each read-pair by using mapper and sorting
+ * Step 2. Maps each read-pair by using mapper and sorting (removeDuplication)
  */
 process mapping {
     tag "$prefix"
     cpus 4
+
+    publishDir "${params.outdir}/BAMs"
  
     input: 
     set val(prefix), file (reads:'*') from read_files_mapping
 
     output:
-    set prefix, file { "sorted.bam" }, file { "sorted.bam.bai" } into bamFiles
+    set prefix, file { "${prefix}.bam" }, file { "${prefix}.bam.bai" } into bamFiles
 
     """
-    bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | samblaster | samtools view -u -Sb - | samtools sort - -o ${prefix}.bam
+    bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | /BiO/BioTools/samblaster/samblaster_addMetrics/samblaster --metricsFile ${prefix}.txt | samtools view -u -Sb - | samtools sort - -o ${prefix}.bam
+    samtools index ${prefix}.bam
     """
 }
 
-bamFiles.into{ bamFiles_metrics; bamFiles_rmdup; }
+bamFiles.into{ bamFiles_metrics; bamFiles_qualimap; bamFiles_BaseRecal }
 
 /*
  * Step 3. metrics for mapping
@@ -120,55 +124,30 @@ bamFiles.into{ bamFiles_metrics; bamFiles_rmdup; }
 process metrics{
     tag "$prefix"
     cpus 4
+    memory '16 GB'
     
     publishDir "${params.outdir}/$prefix/metrics", mode: 'copy'
 
     input:
-    set val(prefix), file('*'), file('*') from bamFiles_metrics
+    set val(prefix), file(read:'*'), file('*') from bamFiles_metrics
 
     output:
-    set file('*.txt') into metrics_txts
-    set file('*.pdf') into metrics_pdf
-    """
-    sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i sorted.bam --algo MeanQualityByCycle mq_metrics.txt --algo QualDistribution qd_metrics.txt --algo GCBias --summary gc_summary.txt gc_metrics.txt --algo AlignmentStat aln_metrics.txt --algo InsertSizeMetricAlgo is_metrics.txt
-    sentieon plot metrics -o metrics-report.pdf gc=gc_metrics.txt qd=qd_metrics.txt mq=mq_metrics.txt isize=is_metrics.txt
-    """
-}
+    set file('*.metrics') into metrics_txts
 
-/*
- * Step 3. Remove PCR duplicates after mapping
- */
-process rmdup{
-    tag "$prefix"
-    cpus 4
-    
-    publishDir "${params.outdir}/$prefix/rmdup"
-
-    input:
-    bamFiles
-    set val(prefix), file('*'), file('*') from bamFiles_rmdup
-
-    output:
-    set val(prefix), file('deduped.bam*') into dedupBamFiles
-    set file('dedup_metrics.txt') into dedupBam_metrics
-    
     """
-    sentieon driver -t ${task.cpus} -i sorted.bam --algo LocusCollector --fun score_info score.txt
-    sentieon driver -t ${task.cpus} -i sorted.bam --algo Dedup --rmdup --score_info score.txt --metrics dedup_metrics.txt deduped.bam
+    java -Xmx16g -Djava.io.tmpdir=./ -jar /BiO/BioTools/bcbio/data/anaconda/share/picard-1.141-3/picard.jar CollectWgsMetrics I=${read} O=${prefix}.metrics R=${params.bwa_index}
     """
 }
-
-dedupBamFiles.into{ dedupBamFiles_qualimap; dedupBamFiles_realign; }
 
 process qualimap {
 	tag "$prefix"
 	cpus 8
 	memory '8 GB'
 
-	publishDir "${params.outdir}/${prefix}/qualimap"
+	publishDir "${params.outdir}/qualimap"
 
 	input:
-	set val(prefix), file(read:'*') from dedupBamFiles_qualimap
+	set val(prefix), file(bam:'*'), file(bai:'*') from bamFiles_qualimap
 
 	output:
 	val(prefix) into qualimap_prefix
@@ -179,91 +158,51 @@ process qualimap {
 	file ( "$prefix/qualimapReport.html" ) into qualimap_report_html
 	
 	"""
-	qualimap bamqc --java-mem-size=8G -bam deduped.bam -gd HUMAN -nt ${task.cpus} -outdir $prefix
+	qualimap bamqc --java-mem-size=8G -bam ${bam} -gd HUMAN -nt ${task.cpus} -outdir $prefix
 	"""
 }
 
 /*
- * Step 4. Indel realignment after dedup
- */
-process indelrealign{
-	tag "$prefix"
-	cpus 4
-
-	input:
-	set val(prefix), file('*') from dedupBamFiles_realign
-
-	output:
-	set val(prefix), file('realigned.bam*') into realignedBamFiles
-
-	"""
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i deduped.bam --algo Realigner -k ${params.known_sites} realigned.bam
-	"""
-}
-
-realignedBamFiles.into { realignedBamFiles_forBaseRecal; realignedBamFiles_UG; realignedBamFiles_HC; }
-
-/*
- * Step 5. Base recalibration after indel realignment 
+ * Step 5. Base recalibration 
  */ 
 process baserecal{
 	tag "$prefix"
 	cpus 4
+	memory '16 GB'
 
 	input:
-	set val(prefix), file('*') from realignedBamFiles_forBaseRecal
+	set val(prefix), file(bam:'*'), file(bai:'*') from bamFiles_BaseRecal
 
 	output:
-	set file('recal.csv') into baseRecal_csv
-	set file('recal_plots.pdf') into baseRecal_plot
-	set file('recal_data.table') into baseRecal_table
+	set file('recal_data.table') into baserecal_table
+	set prefix, file("${prefix}.recal.bam"), file { "${prefix}.recal.bai" }  into recalBamFiles
 
 	"""
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam --algo QualCal -k ${params.dbsnp} -k ${params.known_sites} recal_data.table
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam -q recal_data.table --algo QualCal -k ${params.dbsnp} -k ${params.known_sites} recal_data.table.post
-	sentieon driver -t ${task.cpus} --algo QualCal --plot --before recal_data.table --after recal_data.table.post recal.csv
-	sentieon plot bqsr -o recal_plots.pdf recal.csv
+	# Analyze patterns of covariation in the sequence dataset
+	java -Xmx16g -Djava.io.tmpdir=./ -jar ${params.gatk} -T BaseRecalibrator -R ${params.bwa_index} -I ${bam} -knownSites ${params.dbsnp} -knownSites ${params.known_sites} -o recal_data.table
+	# Do a second pass to analyze covariation remaining after recalibration
+	java -Xmx16g -Djava.io.tmpdir=./ -jar ${params.gatk} -T BaseRecalibrator -R ${params.bwa_index} -I ${bam} -knownSites ${params.dbsnp} -knownSites ${params.known_sites} -BQSR recal_data.table -o post_recal_data.table
+	# Generate before/after plots
+	java -Xmx16g -Djava.io.tmpdir=./ -jar ${params.gatk} -T AnalyzeCovariates -R ${params.bwa_index} -before recal_data.table -after post_recal_data.table -plots recalibration_plots.pdf
+	# Apply the recalibration to your sequence datia
+	java -Xmx16g -Djava.io.tmpdir=./ -jar ${params.gatk} -T PrintReads -R ${params.bwa_index} -I ${bam} -BQSR recal_data.table -o ${prefix}.recal.bam
 	"""
 }
 
-baseRecal_table.into{ baseRecal_table_forUG; baseRecal_table_forHC; }
-
-/*
- * Step 6. Variant calling for analysis ready-bam files
- */ 
-process variant_call_UG{
-	tag "$prefix"
-	cpus 4
-    
-	publishDir "${params.outdir}/$prefix/variant_UG"
-
-	input:
-	set val(prefix), file('*') from realignedBamFiles_UG
-	set file('*') from baseRecal_table_forUG
-
-	output:
-	set file('output-ug.vcf.gz*') into variant_UG
-
-	"""
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam -q recal_data.table --algo Genotyper -d ${params.dbsnp} --var_type both --emit_conf=10 --call_conf=30 output-ug.vcf.gz
-	"""
-}
-
-process variant_call_HC{
+process variant_call{
 	tag "$prefix"
 	cpus 4
 	
 	publishDir "${params.outdir}/$prefix/variant_HC"
 
 	input:
-	set val(prefix), file('*') from realignedBamFiles_HC
-	set file('*') from baseRecal_table_forHC
+	set val(prefix), file(bam:'*'),file from recalBamFiles
 
 	output:
-	set file('output-hc.vcf.gz*') into variant_HC
+	set file('raw_variant.g.vcf*') into variant_HC
 
 	"""
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam -q recal_data.table --algo Haplotyper -d ${params.dbsnp} --emit_conf=10 --call_conf=30 --prune_factor=3 output-hc.vcf.gz
+	java -Xmx16g -Djava.io.tmpdir=./ -jar ${params.gatk} -T HaplotypeCaller -R ${params.bwa_index} -I ${prefix}.recal.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -o raw_variant.g.vcf
 	"""
 }
 
