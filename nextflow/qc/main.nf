@@ -25,6 +25,7 @@ params.genome = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/seq/GRCh37.fa'
 params.bwa_index = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/bwa/GRCh37.fa'
 params.gtf = ''
 params.rlocation = ''
+params.bed = '/BiO/BioResources/References/Human/hg19/targetkit/SureSelect_Human_All_Exon_V5.bed'
 
 params.name = "QC Best practice"
 //params.reads = '/BiO/BioProjects/QCsystem/rawreads/TBD160338-test/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
@@ -38,7 +39,7 @@ log.info "===================================="
 log.info "Reads        : ${params.reads}"
 log.info "Genome       : ${params.genome}"
 log.info "Index        : ${params.index}"
-log.info "Annotation   : ${params.gtf}"
+log.info "Region       : ${params.bed}"
 log.info "Current home : $HOME"
 log.info "Current user : $USER"
 log.info "Current path : $PWD"
@@ -48,20 +49,16 @@ log.info "Working dir  : $workDir"
 log.info "Output dir   : ${params.outdir}"
 log.info "===================================="
 
-/*
 // Validate inputs
-*index = file(params.index)
-*gtf   = file(params.gtf)
-*bed12 = file(params.bed12)
-*if( !index.exists() ) exit 1, "Missing STAR index: ${index}"
-*if( !gtf.exists() )   exit 2, "Missing GTF annotation: ${gtf}"
-*if( !bed12.exists() ) exit 2, "Missing BED12 annotation: ${bed12}"
-*/
+index = file(params.bwa_index)
+//gtf   = file(params.gtf)
+bed = file(params.bed)
+if( !index.exists() ) exit 1, "Missing reference index: ${index}"
+if( !bed.exists() ) exit 2, "Missing BED annotation: ${bed}"
 
 /*
  * Create a channel for read files
  */
- 
 Channel
      .fromPath( params.reads )
      .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
@@ -139,7 +136,7 @@ process qualimap {
 	file ( "${prefix}_stats/raw_data_qualimapReport/*.txt" ) into qualimap_report_txts
 	
 	"""
-	qualimap bamqc -bam $reads -c -gd HUMAN -nt ${task.cpus}
+	qualimap bamqc --feature-file ${bed} -bam ${reads} -c -gd HUMAN -nt ${task.cpus}
 	"""
 }
 

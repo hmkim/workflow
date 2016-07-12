@@ -1,0 +1,63 @@
+"""
+Author: Hyunmin Kim
+Affiliation: TheragenEtex Bio Institute
+Aim: A simple Snakemake workflow to process paired-end stranded RNA-Seq.
+Date: Mon July 11 17:44:11 KST 2016
+
+Run: snakemake   -s Snakefile 
+Latest modification: 
+  - todo
+"""
+
+##-----------------------------------------------##
+## A set of functions
+##-----------------------------------------------##
+import sys
+
+def message(mes):
+  sys.stderr.write("|--- " + mes + "\n")
+
+# This should be placed in the Snakefile.
+
+##-----------------------------------------------##
+## Working directory                             ##
+## Adapt to your needs                           ##
+##-----------------------------------------------##
+
+BASE_DIR = "/BiO/BioPeople/brandon/test_snakemake/rnaseq"
+WDIR = BASE_DIR + "/t-cell_analysis"
+workdir: WDIR
+message("The current working directory is " + WDIR)
+
+##--------------------------------------------------------------------------------------##
+## Variables declaration                          
+## Declaring some variables used by topHat and other tools... 
+## (GTF file, INDEX, chromosome length)
+##--------------------------------------------------------------------------------------##
+# Adapt the path to your needs
+INDEX = "/BiO/BioTools/bcbio/data/genomes/Mmusculus/mm10/bowtie2/mm10"
+GTF   = "/BiO/BioTools/bcbio/data/genomes/Mmusculus/mm10/rnaseq/ref-transcripts.gtf"
+CHR   = "/BiO/BioTools/bcbio/data/genomes/Mmusculus/mm10/seq/mm10.fa.fai"
+FASTA = "/BiO/BioTools/bcbio/data/genomes/Mmusculus/mm10/seq/mm10.fa"
+
+##--------------------------------------------------------------------------------------##
+## The list of samples to be processed
+##--------------------------------------------------------------------------------------##
+SAMPLES, = glob_wildcards("/BiO/BioPeople/brandon/test_snakemake/rnaseq/{smp}_R1.fq.gz")
+NB_SAMPLES = len(SAMPLES)
+
+
+for smp in SAMPLES:
+  message("Sample " + smp + " will be processed")
+
+
+rule trimming:
+  input:  fwd="samples/raw/{smp}_R1.fq.gz", rev="samples/raw/{smp}_R2.fq.gz"
+  output: fwd="samples/trimmed/{smp}_R1_t.fq", 
+          rev="samples/trimmed/{smp}_R2_t.fq", 
+          single="samples/trimmed/{smp}_R1_singletons.fq"
+  message: """--- Trimming."""
+  shell: """
+        sickle pe -f {input.fwd} -r {input.rev}  -l 40 -q 20 -t sanger  -o {output.fwd} -p {output.rev} -s {output.single} &> {input.fwd}.log                                                                               
+  """
+
