@@ -10,3 +10,4 @@ r-ggplot2=2.1.0
 r-gplots=3.0.1
 r-reshape=0.8.5
 r-gsalib=2.1
+snpeff=4.2

@@ -15,8 +15,7 @@ as single end.
 version = 0.1
 
 // Configurable variables
-params.genome = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/seq/GRCh37.fa'
-params.bwa_index = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/bwa/GRCh37.fa'
+params.genome = '/BiO/BioResources/References/Human/hg19_LT/hg19.fasta'
 params.known_sites = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/variation/Mills_and_1000G_gold_standard.indels.vcf.gz'
 params.dbsnp = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/variation/dbsnp_138.vcf.gz'
 params.gtf = ''
@@ -24,11 +23,15 @@ params.rlocation = ''
 params.gatk = "/BiO/BioTools/miniconda3/opt/gatk-3.6/GenomeAnalysisTK.jar" 
 params.genome_version = "GRCh37.75"
 
-params.name = "Best practice for WGS analysis"
+params.name = "Best practice for Proton target analysis (Ion Proton)"
+params.tmap = "/BiO/BioTools/TS/build/Analysis/TMAP/tmap"
+
+tmap = file(params.tmap)
 
 // Input reads
-params.reads = '/BiO/BioPeople/brandon/test_nextflow_wgs/*_{1,2}.fq.gz'
-params.outdir = '/BiO/BioPeople/brandon/test_nextflow_wgs/outdir'
+params.reads = '/backup/wolf/sgpark/Projects/TeRef/RawData/20141014_ProtonExome_11Sample/RawData/*fastq.gz'
+// Output directory
+params.outdir = 'result'
 
 log.info "===================================="
 log.info " WGS Best Practice v${version}"
@@ -46,11 +49,10 @@ log.info "Working dir  : $workDir"
 log.info "Output dir   : ${params.outdir}"
 log.info "===================================="
 
-// Validate inputs
-index = file(params.bwa_index)
-if( !index.exists() ) exit 1, "Missing BWA index: ${index}"
-
-/* Create a channel for read files */
+/*
+ * Create a channel for read files
+ */
+ 
 Channel
      .fromPath( params.reads )
      .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
@@ -64,76 +66,93 @@ Channel
 read_files.into { read_files_fastqc; read_files_mapping;}
 
 
-/* STEP 1 - FastQC */
+/*
+ * STEP 1 - FastQC
+ */
 process fastqc {
-	tag "$prefix"
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/wgs/bin:$PATH'
-
-	memory { 2.GB * task.attempt }
-	time { 4.h * task.attempt }
-
-	errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
-	maxRetries 3
-	maxErrors '-1'
-
-	publishDir "${params.outdir}/$prefix/fastqc", mode: 'copy'
-
-	input:
-	set val(prefix), file(reads:'*') from read_files_fastqc
-
-	output:
-	file '*_fastqc.html' into fastqc_results_html
-	file '*_fastqc.zip' into fastqc_results_zip
-
-	"""
-	fastqc $reads
-	"""
+     tag "$prefix"
+     
+     memory { 2.GB * task.attempt }
+     time { 4.h * task.attempt }
+     
+     errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
+     maxRetries 3
+     maxErrors '-1'
+     
+     publishDir "${params.outdir}/$prefix/fastqc", mode: 'copy'
+     
+     input:
+     set val(prefix), file(reads:'*') from read_files_fastqc
+     
+     output:
+     file '*_fastqc.html' into fastqc_results_html
+     file '*_fastqc.zip' into fastqc_results_zip
+     
+     """
+     fastqc $reads
+     """
 }
 
-/* Step 2. Maps each read-pair by using mapper and sorting (removeDuplication) */
+/*
+ * Step 2. Maps each read-pair by using mapper and sorting (removeDuplication)
+ */
 process mapping {
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/wgs/bin:$PATH'
 	tag "$prefix"
-	cpus 4
+	cpus 24
 
 	publishDir "${params.outdir}/BAMs"
 
 	input: 
-	set val(prefix), file (reads:'*') from read_files_mapping
+	set val(prefix), file (read:'*') from read_files_mapping
 
 	output:
 	set prefix, file { "${prefix}.bam" }, file { "${prefix}.bam.bai" } into bamFiles
 
 	"""
-	bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | /BiO/BioTools/samblaster/samblaster_addMetrics/samblaster --metricsFile ${prefix}.txt | samtools view -u -Sb - | samtools sort - -o ${prefix}.bam
-	samtools index ${prefix}.bam
+	# -v,--verbose                                            print verbose progress information [false]
+	# -u,--rand-read-name                                     specifies to randomize based on the read name [false]
+	# -y,--softclip-key                                       soft clip only the last base of the key [false]
+	# --prefix-exclude                         INT            specify how many letters of prefix of name to be excluded when do randomize by name [false]
+	# -o,--output-type                         INT            the output type [0]
+	#   0 - SAM
+	#   1 - BAM (compressed)
+	#   2 - BAM (uncompressed)
+        # -J,--max-adapter-bases-for-soft-clipping INT            specifies to perform 3' soft-clipping (via -g) if at most this # of adapter bases were found (ZB tag) [2147483647]
+	# --end-repair                             INT            specifies to perform 5' end repair [0]
+	#  0 - disable
+	#  1 - prefer mismatches
+	#  2 - prefer indels
+	#  >2 - specify %% Mismatch above which to trim end alignment
+	#  --do-repeat-clip                                        clip tandem repeats from the alignment 3' ends [false]
+	#  --context                                               realign with context-dependent gap scores [0]
+
+	${tmap} mapall -n ${task.cpus} -f ${params.genome} -r ${read} -v -Y -u --prefix-exclude 5 -o 2 -J 25 --end-repair 15 --do-repeat-clip --context stage1 map4 | samtools sort -m 1000M -l1 -@12 - /results/analysis/output/Home/Auto_user_Proton01-380-20160622_TBD160346_4_555_829/plugin_out/variantCaller_out.2771/
 	"""
 }
 
 bamFiles.into{ bamFiles_metrics; bamFiles_qualimap; bamFiles_BaseRecal }
 
-/* Step 3. metrics for mapping */
+/*
+ * Step 3. metrics for mapping
+ */
 process metrics{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/wgs/bin:$PATH'
-	tag "$prefix"
-	cpus 4
-	memory '16 GB'
+    tag "$prefix"
+    memory '16 GB'
+    
+    publishDir "${params.outdir}/$prefix/metrics", mode: 'copy'
 
-	publishDir "${params.outdir}/$prefix/metrics", mode: 'copy'
+    input:
+    set val(prefix), file(read:'*'), file('*') from bamFiles_metrics
 
-	input:
-	set val(prefix), file(read:'*'), file('*') from bamFiles_metrics
+    output:
+    set file('*.metrics') into metrics_txts
 
-	output:
-	set file('*.metrics') into metrics_txts
-
-	"""
-	java -Xmx16g -Djava.io.tmpdir=./ -jar /BiO/BioTools/bcbio/data/anaconda/share/picard-1.141-3/picard.jar CollectWgsMetrics I=${read} O=${prefix}.metrics R=${params.bwa_index}
-	"""
+    """
+    java -Xmx16g -Djava.io.tmpdir=./ -jar /BiO/BioTools/bcbio/data/anaconda/share/picard-1.141-3/picard.jar CollectWgsMetrics I=${read} O=${prefix}.metrics R=${params.bwa_index}
+    """
 }
 
 process qualimap {
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/wgs/bin:$PATH'
 	tag "$prefix"
 	cpus 8
 	memory '8 GB'
@@ -156,9 +175,10 @@ process qualimap {
 	"""
 }
 
-/* Step 5. Base recalibration */ 
+/*
+ * Step 5. Base recalibration 
+ */ 
 process baserecal{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/wgs/bin:$PATH'
 	tag "$prefix"
 	cpus 4
 	memory '16 GB'
@@ -183,7 +203,6 @@ process baserecal{
 }
 
 process variant_call{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/wgs/bin:$PATH'
 	tag "$prefix"
 	cpus 4
 	
@@ -200,9 +219,12 @@ process variant_call{
 	"""
 }
 
-/* Step 7. Variant annotation */
+/*
+ * Step 7. Variant annotation
+ */
+
 process snpeff{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/wgs/bin:$PATH'
+	beforeScript 'set +u; source activate wgs; set -u'
 	tag "$prefix"
 	
 	publishDir "${params.outdir}/$prefix/variant"
