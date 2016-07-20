@@ -21,14 +21,12 @@ as single end.
 version = 0.1
 
 // Configurable variables
-params.genome = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/seq/GRCh37.fa'
 params.bwa_index = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/bwa/GRCh37.fa'
-params.gtf = ''
-params.rlocation = ''
-params.bed = '/BiO/BioResources/References/Human/hg19/targetkit/SureSelect_Human_All_Exon_V5.bed'
+//params.bed = '/BiO/BioResources/References/Human/hg19/targetkit/SureSelect_Human_All_Exon_V5.bed'
+params.bed = '/BiO/BioPeople/brandon/test_nextflow/qc/SureSelect_Human_All_Exon_V5.bed'
 
 params.name = "QC Best practice"
-//params.reads = '/BiO/BioProjects/QCsystem/rawreads/TBD160338-test/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
+//params.reads = '/BiO/BioPeople/brandon/test_nextflow/qc/TBD160338-test/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
 //params.outdir = '/BiO/BioPeople/brandon/test_nextflow/qc/outdir-test'
 params.reads = '/BiO/BioProjects/QCsystem/rawreads/160614_D00236_0448_AC9VP7ANXX/Unaligned/TBD160338/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
 params.outdir = '/BiO/BioPeople/brandon/test_nextflow/qc/outdir'
@@ -37,8 +35,7 @@ log.info "===================================="
 log.info " QC Best Practice v${version}"
 log.info "===================================="
 log.info "Reads        : ${params.reads}"
-log.info "Genome       : ${params.genome}"
-log.info "Index        : ${params.index}"
+log.info "Index        : ${params.bwa_index}"
 log.info "Region       : ${params.bed}"
 log.info "Current home : $HOME"
 log.info "Current user : $USER"
@@ -76,7 +73,7 @@ read_files.into { read_files_fastqc; read_files_mapping; }
  */
 
 process fastqc {
-	beforeScript 'set +u; source activate qc; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/qc/bin:$PATH'
 
 	tag "$prefix"
 
@@ -104,7 +101,7 @@ process fastqc {
  * Step 2. Maps each read-pair by using mapper
  */
 process mapping {
-	beforeScript 'set +u; source activate qc; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/qc/bin:$PATH'
 
 	tag "$prefix"
 	cpus 5
@@ -127,7 +124,7 @@ process mapping {
  bamFilesForVariantCalling) = bamFiles.separate(3) { x -> [ x, x, x ] }
 
 process qualimap {
-	beforeScript 'set +u; source activate qc; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/qc/bin:$PATH'
 	tag "$prefix"
 	cpus 8
 
@@ -137,16 +134,18 @@ process qualimap {
 	set val(prefix), file(reads:"${prefix}.bam"), file (index:"${prefix}.bam.bai") from bamFilesForQualimap
 
 	output:
-	file ( "${prefix}_stats/genome_results.txt" ) into qualimap_genome_results 
-	file ( "${prefix}_stats/raw_data_qualimapReport/*.txt" ) into qualimap_report_txts
+	file ( "${prefix}/genome_results.txt" ) into qualimap_genome_results 
+	file ( "${prefix}/raw_data_qualimapReport/*.txt" ) into qualimap_report_txts
 	
 	"""
-	qualimap bamqc --feature-file ${bed} -bam ${reads} -c -gd HUMAN -nt ${task.cpus}
+	qualimap bamqc --java-mem-size=8G -bam ${reads} -c -gd HUMAN -nt ${task.cpus} --feature-file ${bed} 
+	mv ${prefix}_stats/ ${prefix}
 	"""
 }
 
 process multiqc{
-	beforeScript 'set +u; source activate qc; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/qc/bin:$PATH'
+	//beforeScript 'set +u; source activate qc; set -u'
 
 	publishDir "${params.outdir}/multiqc", mode: 'copy'
 
