@@ -31,10 +31,10 @@ Channel
 read_files.into { read_files_fastqc; read_files_trimming; }
 
 process runFastQC_original{
-	beforeScript 'set +u; source activate smrna; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 	cpus params.fastqc.cpus
 
-	publishDir "${params.outdir}/fastqc";
+	//publishDir "${params.outdir}/fastqc";
 
 	input:
 	set val(prefix),  file(read) from read_files_fastqc
@@ -48,10 +48,11 @@ process runFastQC_original{
 	"""
 }
 
+
 process trim{
-	beforeScript 'set +u; source activate smrna; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 	
-	publishDir "${params.outdir}/trim";
+	publishDir "${params.outdir}/trimmed/$prefix";
 
 	input:
 	set val(prefix), file(read) from read_files_trimming
@@ -74,25 +75,49 @@ process trim{
 readTrimmed.into { readTrimmed_fastqc; readTrimmed_TdrMapping; readTrimmed_collapse; }
 
 process runFastQC_trimmed {
-	beforeScript 'set +u; source activate smrna; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 	cpus params.fastqc.cpus
 	
-	publishDir "${params.outdir}/fastqc_trimmed";
+	//publishDir "${params.outdir}/fastqc_trimmed";
 
 	input:
 	set val(prefix), file(read) from readTrimmed_fastqc
 
 	output:
 	file '*_fastqc.html' into fastqc_html_trimmed
-	file '*_fastqc.zip' into fastqc_zip_trimmed
+	set val(prefix), file('*_fastqc.zip') into fastqc_zip_trimmed
 
 	"""
 	fastqc -t ${params.fastqc.cpus} ${read}
 	"""
 	}
 
+process qc{
+	publishDir "${params.outdir}/qc/${prefix}/fastqc";
+
+	input:
+	file(html) from fastqc_html_trimmed
+	set val(prefix), file(zip) from fastqc_zip_trimmed
+
+	output:
+	file("${extract_name}/*.tsv") into fastqc_result_tsv
+	file("${extract_name}/fastqc_data.txt") into fastqc_data_txt
+	file("${extract_name}/fastqc_report.html") into fastqc_report_html
+	file("${prefix}.zip") into fastqc_zip
+
+	exec:
+	extract_name = zip.name.take(zip.name.lastIndexOf('.'))
+
+	shell:
+	"""
+	ln -s ${zip} ${prefix}.zip
+	unzip ${zip}
+	python ${params.script_dir}/fastqc_parser.py ${extract_name} ${prefix}
+	"""
+}
+
 process collapseRead{
-	beforeScript 'set +u; source activate smrna; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 
 	input:
 	set val(prefix), file(read) from readTrimmed_collapse
@@ -108,7 +133,9 @@ process collapseRead{
 
 /* https://github.com/sararselitsky/tDRmapper */
 process TdrMapping{
-	publishDir "${params.outdir}/TdrMapping";
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	
+	publishDir "${params.outdir}/trna/$prefix";
 
 	input:
 	set val(prefix), file(read) from readTrimmed_TdrMapping
@@ -117,116 +144,196 @@ process TdrMapping{
 	file '*' into tdrMapping_results
 
 	"""
-	/BiO/BioTools/bcbio/data/anaconda/bin/TdrMappingScripts.pl ${params.trna_mature_pre} ${read}
+	TdrMappingScripts.pl ${params.trna_mature_pre} ${read}
 	"""
 }
 
-collapsedRead_files.into { crf_prepare_makeList; crf_prepare; crf_miraligner; }
-collapsedRead_prefix.into { crp_prepare_makeList; crp_prepare; crp_miraligner; }
-
-/* http://seqcluster.readthedocs.io/mirna_annotation.html */
-process miraligner{
-	input:
-	val(prefix) from crp_miraligner;
-	file(read) from crf_miraligner;
-
-	output:
-	file '*.mirna' into miraligner_map
-	file '*.mirna.nomap' into miraligner_nomap
-	file '*.mirna.opt' into miraligner_opt
-
-	"""
-	export PATH=/BiO/BioTools/bcbio/data/anaconda/bin:\$PATH
-	/BiO/BioTools/bcbio/data/anaconda/bin/miraligner -Xms705m -Xmx4500m -sub 1 -trim 3 -add 3 -s ${params.species} -i ${read} -db ${params.db_srnaseq} -o sample
-	python ${params.script_dir}/miraligner_parser.py sample.mirna sample.bak sample
-	"""
-}
-
-process seqcluster_prepare_makeList{
-	beforeScript 'set +u; source activate smrna; set -u'
-
-	input:
-	val(prefix) from crp_prepare_makeList.toList()
-	file(read) from crf_prepare_makeList.toList()
-
-	output:
-	file 'fileList.txt' into prepare_filelist
-
-	echo true
-
-	"""
-	IN="${read}"
-	IN2="${prefix}"
-
-	IN2=\${IN2:1:-1}
-
-	OIFS=\$IFS
-	IFS=', '
-
-	array1=( \$IN )
-	array2=( \$IN2 )
-
-	for i in "\${!array1[@]}"; do
-		echo -e "\${array1[i]}\\t\${array2[i]}" >> fileList.txt
-	done
-	"""
-}
+collapsedRead_files.into { crf_prepare; crf_miraligner; crf_miraligner_novel }
+collapsedRead_prefix.into { crp_prepare; crp_miraligner; crp_miraligner_novel }
 
 process seqcluster_prepare{
-	beforeScript 'set +u; source activate smrna; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 
-	publishDir "${params.outdir}/seqcluster";
+	publishDir "${params.outdir}/seqcluster/prepare";
 
 	input:
-	file filelist from prepare_filelist
 	val(prefix) from crp_prepare.toList()
-	file(fastq) from crf_prepare.toList()
+	file(reads) from crf_prepare.toList()
 
 	output:
 	file 'seqs.ma' into seqs_ma
-	file 'seqs.fa' into seqs_fa
+	file 'seqs.fastq' into seqs_fastq
+	file 'stats_prepare.tsv' into stats_prepare
 
+	exec:
+	prefix = prefix.join(",")
+	reads = reads.toString().tokenize().join(",")
+
+	shell:	
 	"""
-	python ${params.script_dir}/prepare_data.py ${filelist}
+	python ${params.script_dir}/prepare_data.py ${prefix} ${reads}
 	"""
 }
+
+stats_prepare.subscribe onNext: { println it }, onComplete: { println 'Done.'}
 
 seqs_ma.into { mirdeep2_seqs_ma; seqcluster_cluster_seqs_ma; }
 
 process mapping{
-	beforeScript 'set +u; source activate smrna; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	
+	publishDir "${params.outdir}/align";
 
 	cpus params.sambamba.cpus
 	cpus params.star.cpus
 
 	input:
-	set file(read) from seqs_fa
+	set file(read) from seqs_fastq
 
 	output:
-	file 'seqs.bam' into star_bam
-	file 'seqs.bam.bai' into star_bam_index
-	file 'Log.final.out' into star_log
+	file 'seqs.bam*' into star_bam
 
 	"""
-	/BiO/BioTools/bcbio/data/anaconda/bin/STAR --genomeDir $params.db_star --readFilesIn $read --runThreadN ${params.star.cpus} --outFileNamePrefix ./ --outReadsUnmapped Fastx --outFilterMultimapNmax 1000 --outStd SAM --alignIntronMax 1 --outSAMunmapped Within --outSAMattributes NH HI NM MD AS  --sjdbGTFfile $params.gtf_ref_transcripts --sjdbOverhang 39  --outSAMattrRGline ID:miRQC_A PL:illumina PU:1_2016-04-08_mir2qc_bcbio SM:miRQC_A | /BiO/BioTools/bcbio/data/galaxy/../anaconda/bin/samtools sort -@ 1 -m 16G -o seqs.bam /dev/stdin
+	STAR --genomeDir $params.db_star --readFilesIn $read --runThreadN ${params.star.cpus} --outFileNamePrefix ./ --outReadsUnmapped Fastx --outFilterMultimapNmax 1000 --outStd SAM --alignIntronMax 1 --outSAMunmapped Within --outSAMattributes NH HI NM MD AS  --sjdbGTFfile $params.gtf_ref_transcripts --sjdbOverhang 39  --outSAMattrRGline ID:miRQC_A PL:illumina PU:1_2016-04-08_mir2qc_bcbio SM:miRQC_A | /BiO/BioTools/bcbio/data/galaxy/../anaconda/bin/samtools sort -@ 1 -m 16G -o seqs.bam /dev/stdin
 	sambamba index -t ${params.sambamba.cpus} seqs.bam
 	"""
 
 }
 
+star_bam.into { star_bam_for_mirdeep2; star_bam_for_cluster; }
+
+process seqcluster_cluster{
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	
+	publishDir "${params.outdir}/seqcluster/cluster";
+
+	input:
+	file '*' from seqcluster_cluster_seqs_ma
+	file (bam:'*') from star_bam_for_cluster
+
+	output:
+	file 'seqcluster.json' into seqcluster_json
+
+	"""
+	seqcluster cluster -o ./ -m seqs.ma -a seqs.bam -r ${params.ref_fasta} -g ${params.gtf_srna_transcripts} 
+	"""
+}
+
+process seqcluster_report{
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	publishDir "${params.outdir}/seqcluster/report";
+
+	input:
+	file '*' from seqcluster_json
+
+	output:
+	file 'seqcluster.db' into seqcluster_report_db
+	file 'html/' into seqcluster_report_html
+	file 'log/' into seqcluster_report_log
+
+	"""
+	seqcluster report -o ./ -r ${params.ref_fasta} -j seqcluster.json
+	"""
+}
+
 process mirdeep2{
-	beforeScript 'set +u; source activate smrna; set -u'
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 
 	publishDir "${params.outdir}/mirdeep2";
 
 	input:
-	set file(seqs_ma) from mirdeep2_seqs_ma
-	set file(bam) from star_bam
-	set file(bai) from star_bam_index
+	file('*') from mirdeep2_seqs_ma
+	file('*') from star_bam_for_mirdeep2
+
+	output:
+	file 'novel' into mirdeep2_novel
 
 	"""
-	python ${params.script_dir}/mirdeep_prepare.py ${bam} ${seqs_ma}
+	python ${params.script_dir}/mirdeep_prepare.py seqs.bam seqs.ma
 	unset PERL5LIB && export PATH=/BiO/BioTools/bcbio/data/anaconda/bin:$PATH && perl /BiO/BioTools/bcbio/data/anaconda/bin/miRDeep2.pl file_reads.fa ${params.ref_fasta} align.bam ${params.mature_fa} none ${params.hairpin_fa} -f ${params.Rfam_for_miRDeep} -r simple -c -P -t ${params.species} -z res
 	python ${params.script_dir}/mirdeep_parse_novel.py result_res.csv ${params.species}
+	"""
+}
+
+/* http://seqcluster.readthedocs.io/mirna_annotation.html */
+process miraligner{
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	
+	publishDir "${params.outdir}/mirbase/$prefix";
+
+	input:
+	val(prefix) from crp_miraligner;
+	file(read) from crf_miraligner;
+
+	output:
+	val(prefix) into mirna_prefix
+	file('*.mirna') into mirna_file
+
+	"""
+	/BiO/BioTools/bcbio/data/anaconda/bin/miraligner -Xms705m -Xmx4500m -freq -sub 1 -trim 3 -add 3 -s ${params.species} -i ${read} -db ${params.db_srnaseq} -o ${prefix}
+	"""
+}
+
+process miraligner_novel{
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	
+	publishDir "${params.outdir}/mirbase/$prefix";
+
+	input:
+	val(prefix) from crp_miraligner_novel;
+	file(read) from crf_miraligner_novel;
+
+	file(novel_db_path) from mirdeep2_novel.first();
+
+	output:
+	val(prefix) into mirna_novel_prefix
+	file('*.mirna') into mirna_novel_file	
+	"""
+	/BiO/BioTools/bcbio/data/anaconda/bin/miraligner -Xms705m -Xmx4500m -freq -sub 1 -trim 3 -add 3 -s ${params.species} -i ${read} -db ${novel_db_path} -o ${prefix}_novel
+	"""
+}
+
+
+mirna_file.into { mirna_for_qc; mirna_for_miraligner_parse }
+mirna_novel_file.into { mirna_novel_for_qc; mirna_novel_for_miraligner_parse }
+
+process qc_srna{
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	
+	publishDir "${params.outdir}/qc/$prefix/small-rna";
+
+	input:
+	file(known:'*.mirna') from mirna_for_qc
+	file(novel:'*.mirna') from mirna_novel_for_qc
+
+	"""
+	python ${params.script_dir}/qc_srna.py ${known} ${novel}
+	"""
+}
+
+process miraligner_parse{
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+
+	publishDir "${params.outdir}/";
+
+	input:
+	val(prefix) from mirna_prefix.toList()
+	file(mirna) from mirna_for_miraligner_parse.toList()
+	file(mirna_novel) from mirna_novel_for_miraligner_parse.toList()
+
+	output:
+	file('mirbase/') into known_mirna_result
+	file('mirdeep2/') into novel_mirna_result
+
+	exec:
+	prefix = prefix.join(",")
+	mirna = mirna.toString().tokenize().join(",")
+	mirna_novel = mirna_novel.toString().tokenize().join(",")
+
+	shell:	
+	"""
+	mkdir mirbase
+	mkdir mirdeep2
+	python ${params.script_dir}/miraligner_parser.py ${prefix} ${mirna}
 	"""
 }

@@ -1,0 +1,7 @@
+# This file may be used to create an environment using:
+# $ conda create --name genefusion -c bioconda --file <this file>
+samtools=1.3.1
+bowtie2
+fastx_toolkit=0.0.14
+bbmap=35.85
+bioconductor-iranges

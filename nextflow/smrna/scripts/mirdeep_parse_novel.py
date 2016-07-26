@@ -13,6 +13,7 @@ from bcbio.pipeline import config_utils
 
 def _parse_novel(csv_file, sps="new"):
     """Create input of novel miRNAs from miRDeep2"""
+    print csv_file
     read = 0
     seen = set()
     safe_makedir("novel")
@@ -43,7 +44,8 @@ def _parse_novel(csv_file, sps="new"):
     return op.abspath("novel")
 
 if __name__ == "__main__":
-	out_file = sys.argv[0]
-	species = sys.argv[1]
-	novel_db = _parse_novel(out_file, species)
+	out_file = sys.argv[1]
+	species = sys.argv[2]
+	if file_exists(out_file):
+		novel_db = _parse_novel(out_file, species)
 
