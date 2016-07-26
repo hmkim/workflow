@@ -1,5 +1,5 @@
-params.in = "/BiO/BioProjects/TBI-Transcriptome/CNUHH-Human-RNAseq-2016-04-TBD150692/Rine_Ref/snp/*/*.filter.{hq,lq,mq}.vcf"
-params.out_dir = "/BiO/BioProjects/TBI-Transcriptome/CNUHH-Human-RNAseq-2016-04-TBD150692/VariantAnnotation/output"
+params.in = "/snp/*/*.filter.{hq,lq,mq}.vcf"
+params.out_dir = "/VariantAnnotation/output"
 params.genome_version = "GRCh37.75"
 
 Channel
