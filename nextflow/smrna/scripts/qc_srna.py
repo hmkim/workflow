@@ -1,6 +1,6 @@
 #https://github.com/chapmanb/bcbio-nextgen/blob/c522bfeb327907994cd5aba137211f1e94ecd462/bcbio/qc/srna.py
 import pandas as pd
-import os
+import os,sys
 
 from bcbio import utils
 from bcbio.distributed.transaction import file_transaction, tx_tmpdir
