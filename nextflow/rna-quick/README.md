@@ -1,3 +1,5 @@
+from. https://github.com/jdidion/rna-quick
+
 # Overview
 
 RNA Quick is a pipeline for rapid analysis of gene and transcript quantification and differential expression. Given 1) FASTQ files for one or more samples partitioned between one or more experimental conditions, and 2) a metadata file describing the samples, the following steps are performed:
