@@ -2,3 +2,5 @@
 # $ conda create --name ionproton -c bioconda --file <this file>
 samtools=1.3.1
 fastqc=0.11.5
+bedtools
+gatk

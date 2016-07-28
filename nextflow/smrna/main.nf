@@ -124,7 +124,8 @@ process collapseRead{
 
 	output:
 	val prefix into collapsedRead_prefix
-	file('*_trimmed.fastq') into collapsedRead_files
+	file('*.{fq,fastq}') into collapsedRead_files
+	file('*_size_stats') into collapsedRead_size_stats
 
 	"""
 	python ${params.script_dir}/collapse.py ${read}
@@ -152,7 +153,9 @@ collapsedRead_files.into { crf_prepare; crf_miraligner; crf_miraligner_novel }
 collapsedRead_prefix.into { crp_prepare; crp_miraligner; crp_miraligner_novel }
 
 process seqcluster_prepare{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	env {
+		PATH='/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	}
 
 	publishDir "${params.outdir}/seqcluster/prepare";
 
@@ -165,17 +168,13 @@ process seqcluster_prepare{
 	file 'seqs.fastq' into seqs_fastq
 	file 'stats_prepare.tsv' into stats_prepare
 
-	exec:
-	prefix = prefix.join(",")
-	reads = reads.toString().tokenize().join(",")
-
-	shell:	
+	shell:
+	def prefix = prefix.join(",")
+	def reads = reads.toString().tokenize().join(",")
 	"""
 	python ${params.script_dir}/prepare_data.py ${prefix} ${reads}
 	"""
 }
-
-stats_prepare.subscribe onNext: { println it }, onComplete: { println 'Done.'}
 
 seqs_ma.into { mirdeep2_seqs_ma; seqcluster_cluster_seqs_ma; }
 
