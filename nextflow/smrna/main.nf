@@ -31,7 +31,6 @@ Channel
 read_files.into { read_files_fastqc; read_files_trimming; }
 
 process runFastQC_original{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 	cpus params.fastqc.cpus
 
 	//publishDir "${params.outdir}/fastqc";
@@ -50,8 +49,6 @@ process runFastQC_original{
 
 
 process trim{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-	
 	publishDir "${params.outdir}/trimmed/$prefix";
 
 	input:
@@ -75,7 +72,6 @@ process trim{
 readTrimmed.into { readTrimmed_fastqc; readTrimmed_TdrMapping; readTrimmed_collapse; }
 
 process runFastQC_trimmed {
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 	cpus params.fastqc.cpus
 	
 	//publishDir "${params.outdir}/fastqc_trimmed";
@@ -117,7 +113,7 @@ process qc{
 }
 
 process collapseRead{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
+	publishDir "${params.outdir}/trimmed/$prefix";
 
 	input:
 	set val(prefix), file(read) from readTrimmed_collapse
@@ -134,8 +130,6 @@ process collapseRead{
 
 /* https://github.com/sararselitsky/tDRmapper */
 process TdrMapping{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-	
 	publishDir "${params.outdir}/trna/$prefix";
 
 	input:
@@ -153,14 +147,12 @@ collapsedRead_files.into { crf_prepare; crf_miraligner; crf_miraligner_novel }
 collapsedRead_prefix.into { crp_prepare; crp_miraligner; crp_miraligner_novel }
 
 process seqcluster_prepare{
-	env {
-		PATH='/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-	}
-
 	publishDir "${params.outdir}/seqcluster/prepare";
 
 	input:
-	val(prefix) from crp_prepare.toList()
+	//val(prefix) from crp_prepare.toList()
+	val(prefix) from crp_prepare.toList().map { new nextflow.util.ArrayBag(it) } 
+
 	file(reads) from crf_prepare.toList()
 
 	output:
@@ -179,8 +171,6 @@ process seqcluster_prepare{
 seqs_ma.into { mirdeep2_seqs_ma; seqcluster_cluster_seqs_ma; }
 
 process mapping{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-	
 	publishDir "${params.outdir}/align";
 
 	cpus params.sambamba.cpus
@@ -202,8 +192,6 @@ process mapping{
 star_bam.into { star_bam_for_mirdeep2; star_bam_for_cluster; }
 
 process seqcluster_cluster{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-	
 	publishDir "${params.outdir}/seqcluster/cluster";
 
 	input:
@@ -219,7 +207,6 @@ process seqcluster_cluster{
 }
 
 process seqcluster_report{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
 	publishDir "${params.outdir}/seqcluster/report";
 
 	input:
@@ -236,8 +223,6 @@ process seqcluster_report{
 }
 
 process mirdeep2{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-
 	publishDir "${params.outdir}/mirdeep2";
 
 	input:
@@ -256,8 +241,6 @@ process mirdeep2{
 
 /* http://seqcluster.readthedocs.io/mirna_annotation.html */
 process miraligner{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-	
 	publishDir "${params.outdir}/mirbase/$prefix";
 
 	input:
@@ -274,8 +257,6 @@ process miraligner{
 }
 
 process miraligner_novel{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-	
 	publishDir "${params.outdir}/mirbase/$prefix";
 
 	input:
@@ -297,8 +278,6 @@ mirna_file.into { mirna_for_qc; mirna_for_miraligner_parse }
 mirna_novel_file.into { mirna_novel_for_qc; mirna_novel_for_miraligner_parse }
 
 process qc_srna{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-	
 	publishDir "${params.outdir}/qc/$prefix/small-rna";
 
 	input:
@@ -311,8 +290,6 @@ process qc_srna{
 }
 
 process miraligner_parse{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/smrna/bin/:$PATH'
-
 	publishDir "${params.outdir}/";
 
 	input:
