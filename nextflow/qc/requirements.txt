@@ -6,3 +6,4 @@ bwa=0.7.15
 sambamba=0.6.3
 multiqc=0.7
 samblaster=0.1.22
+r-rmarkdown
