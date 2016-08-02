@@ -1,0 +1,9 @@
+# This file may be used to create an environment using:
+# $ conda create --name lncrna -c biobuilds -c conda-forge -c liulab -c bioconda -c r --file <this file>
+star
+exonerate=2.2.0
+cufflinks=2.2.1
+perl=5.20.3.1
+#perl-bioperl=1.6.924
+r-randomforest=4.6_12
+r-rocr=1.0_7

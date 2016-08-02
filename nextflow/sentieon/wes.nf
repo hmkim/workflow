@@ -19,22 +19,27 @@ params.genome = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/seq/GRCh37.fa'
 params.bwa_index = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/bwa/GRCh37.fa'
 params.known_sites = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/variation/Mills_and_1000G_gold_standard.indels.vcf.gz'
 params.dbsnp = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/variation/dbsnp_138.vcf.gz'
-params.gtf = ''
-params.rlocation = ''
 
 params.name = "Sentieon best practice for WES analysis"
 
 // Input reads
-params.reads = '/BiO/BioPeople/brandon/test_nextflow/wes/example/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
+//params.reads = '/BiO/BioPeople/brandon/test_nextflow/wes/example/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
+params.reads = '/BiO/BioPeople/brandon/precisionFDA/NA12878*_{1,2}.fastq.gz'
+
+
 // Output directory
-params.outdir = '/BiO/BioPeople/brandon/test_nextflow/wes/outdir'
+params.outdir = '/BiO/BioPeople/brandon/test_nextflow/sentieon/outdir'
+
+// Sentieon path and license
+params.sentieon_path = '/BiO/BioTools/sentieon/sentieon-genomics-201606/bin'
+params.sentieon_license = 'export SENTIEON_LICENSE=turtle.ptbio.kr:8990'
 
 log.info "===================================="
 log.info " WES (Sentieon) Best Practice v${version}"
 log.info "===================================="
 log.info "Reads        : ${params.reads}"
 log.info "Genome       : ${params.genome}"
-log.info "Index        : ${params.index}"
+log.info "Index        : ${params.bwa_index}"
 log.info "Annotation   : ${params.gtf}"
 log.info "Current home : $HOME"
 log.info "Current user : $USER"
@@ -52,62 +57,65 @@ if( !index.exists() ) exit 1, "Missing BWA index: ${index}"
 /*
  * Create a channel for read files
  */
- 
 Channel
-     .fromPath( params.reads )
-     .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
-     .map { path ->
+    .fromPath( params.reads )
+    .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
+    .map { path ->
         def prefix = readPrefix(path, params.reads)
         tuple(prefix, path)
-     }
-     .groupTuple(sort: true)
-     .set { read_files }
- 
-read_files.into { read_files_fastqc; read_files_mapping;}
+    }
+    .groupTuple(sort: true)
+    .set { read_files }
+
+read_files.into { read_files_fastqc; read_files_mapping }
+
 
 /*
  * STEP 1 - FastQC
  */
 process fastqc {
-     tag "$prefix"
-     
-     memory { 2.GB * task.attempt }
-     time { 4.h * task.attempt }
-     
-     errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
-     maxRetries 3
-     maxErrors '-1'
-     
-     publishDir "${params.outdir}/$prefix/fastqc", mode: 'copy'
-     
-     input:
-     set val(prefix), file(reads:'*') from read_files_fastqc
-     
-     output:
-     file '*_fastqc.html' into fastqc_results_html
-     file '*_fastqc.zip' into fastqc_results_zip
-     
-     """
-     fastqc $reads
-     """
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/sentieon/bin:\$PATH'
+	tag "$prefix"
+
+	memory { 2.GB * task.attempt }
+	time { 4.h * task.attempt }
+
+	errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
+	maxRetries 3
+	maxErrors '-1'
+
+	publishDir "${params.outdir}/$prefix/fastqc", mode: 'copy'
+
+	input:
+	set val(prefix), file(reads:'*') from read_files_fastqc
+
+	output:
+	file '*_fastqc.html' into fastqc_results_html
+	file '*_fastqc.zip' into fastqc_results_zip
+
+	"""
+	fastqc $reads
+	"""
 }
 
 /*
  * Step 2. Maps each read-pair by using mapper and sorting
  */
 process mapping {
-    tag "$prefix"
-    cpus 4
- 
-    input: 
-    set val(prefix), file (reads:'*') from read_files_mapping
+	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 
-    output:
-    set prefix, file { "sorted.bam" }, file { "sorted.bam.bai" } into bamFiles
+	tag "$prefix"
+	cpus 48
 
-    """
-    bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | sentieon util sort -o sorted.bam -t ${task.cpus} --sam2bam -i -
-    """
+	input: 
+	set val(prefix), file (reads:'*') from read_files_mapping
+
+	output:
+	set prefix, file { "sorted.bam" }, file { "sorted.bam.bai" } into bamFiles
+
+	"""
+	bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | sentieon util sort -o sorted.bam -t ${task.cpus} --sam2bam -i -
+	"""
 }
 
 bamFiles.into{ bamFiles_metrics; bamFiles_rmdup; }
@@ -116,49 +124,52 @@ bamFiles.into{ bamFiles_metrics; bamFiles_rmdup; }
  * Step 3. metrics for mapping
  */
 process metrics{
-    tag "$prefix"
-    cpus 4
-    
-    publishDir "${params.outdir}/$prefix/metrics", mode: 'copy'
+	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
+	tag "$prefix"
+	cpus 4
 
-    input:
-    set val(prefix), file('*'), file('*') from bamFiles_metrics
+	publishDir "${params.outdir}/$prefix/metrics", mode: 'copy'
 
-    output:
-    set file('*.txt') into metrics_txts
-    set file('*.pdf') into metrics_pdf
-    """
-    sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i sorted.bam --algo MeanQualityByCycle mq_metrics.txt --algo QualDistribution qd_metrics.txt --algo GCBias --summary gc_summary.txt gc_metrics.txt --algo AlignmentStat aln_metrics.txt --algo InsertSizeMetricAlgo is_metrics.txt
-    sentieon plot metrics -o metrics-report.pdf gc=gc_metrics.txt qd=qd_metrics.txt mq=mq_metrics.txt isize=is_metrics.txt
-    """
+	input:
+	set val(prefix), file('*'), file('*') from bamFiles_metrics
+
+	output:
+	set file('*.txt') into metrics_txts
+	set file('*.pdf') into metrics_pdf
+	"""
+	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i sorted.bam --algo MeanQualityByCycle mq_metrics.txt --algo QualDistribution qd_metrics.txt --algo GCBias --summary gc_summary.txt gc_metrics.txt --algo AlignmentStat aln_metrics.txt --algo InsertSizeMetricAlgo is_metrics.txt
+	sentieon plot metrics -o metrics-report.pdf gc=gc_metrics.txt qd=qd_metrics.txt mq=mq_metrics.txt isize=is_metrics.txt
+	"""
 }
 
 /*
  * Step 3. Remove PCR duplicates after mapping
  */
 process rmdup{
-    tag "$prefix"
-    cpus 4
-    
-    publishDir "${params.outdir}/$prefix/rmdup"
+	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
+	tag "$prefix"
+	cpus 4
 
-    input:
-    bamFiles
-    set val(prefix), file('*'), file('*') from bamFiles_rmdup
+	publishDir "${params.outdir}/$prefix/rmdup"
 
-    output:
-    set val(prefix), file('deduped.bam*') into dedupBamFiles
-    set file('dedup_metrics.txt') into dedupBam_metrics
-    
-    """
-    sentieon driver -t ${task.cpus} -i sorted.bam --algo LocusCollector --fun score_info score.txt
-    sentieon driver -t ${task.cpus} -i sorted.bam --algo Dedup --rmdup --score_info score.txt --metrics dedup_metrics.txt deduped.bam
-    """
+	input:
+	bamFiles
+	set val(prefix), file('*'), file('*') from bamFiles_rmdup
+
+	output:
+	set val(prefix), file('deduped.bam*') into dedupBamFiles
+	set file('dedup_metrics.txt') into dedupBam_metrics
+
+	"""
+	sentieon driver -t ${task.cpus} -i sorted.bam --algo LocusCollector --fun score_info score.txt
+	sentieon driver -t ${task.cpus} -i sorted.bam --algo Dedup --rmdup --score_info score.txt --metrics dedup_metrics.txt deduped.bam
+	"""
 }
 
 dedupBamFiles.into{ dedupBamFiles_qualimap; dedupBamFiles_realign; }
 
 process qualimap {
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/sentieon/bin:\$PATH'
 	tag "$prefix"
 	cpus 8
 	memory '8 GB'
@@ -185,6 +196,7 @@ process qualimap {
  * Step 4. Indel realignment after dedup
  */
 process indelrealign{
+	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
 	cpus 4
 
@@ -205,6 +217,7 @@ realignedBamFiles.into { realignedBamFiles_forBaseRecal; realignedBamFiles_UG; r
  * Step 5. Base recalibration after indel realignment 
  */ 
 process baserecal{
+	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
 	cpus 4
 
@@ -230,6 +243,7 @@ baseRecal_table.into{ baseRecal_table_forUG; baseRecal_table_forHC; }
  * Step 6. Variant calling for analysis ready-bam files
  */ 
 process variant_call_UG{
+	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
 	cpus 4
     
@@ -248,6 +262,7 @@ process variant_call_UG{
 }
 
 process variant_call_HC{
+	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
 	cpus 4
 	
@@ -269,6 +284,7 @@ process variant_call_HC{
  * Step 7. Variant annotation
  */
 process snpeff_for_UG{
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/sentieon/bin:\$PATH'
 	publishDir "${params.outdir}/$prefix/variant_UG"
 
 	input:
@@ -279,11 +295,12 @@ process snpeff_for_UG{
 	file 'snpEff_summary.*' into ug_eff_summary
 
 	"""
-	/BiO/BioTools/miniconda2/bin/java -Xmx8g -jar /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.jar eff -c /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.config -csvStats snpEff_summary.csv -htmlStats snpEff_summary.html GRCh37.75 output-ug.vcf.gz > output-ug.eff.vcf
+	java -Xmx8g -jar /BiO/BioTools/miniconda3/pkgs/snpeff-4.3-2/share/snpeff-4.3-2/snpEff.jar eff -c /BiO/BioTools/miniconda3/pkgs/snpeff-4.3-2/share/snpeff-4.3-2/snpEff.config -csvStats snpEff_summary.csv -htmlStats snpEff_summary.html GRCh37.75 output-ug.vcf.gz > output-ug.eff.vcf
 	"""
 }
 
 process snpeff_for_HC{
+	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/sentieon/bin:\$PATH'
 	publishDir "${params.outdir}/$prefix/variant_HC"
 
 	input:
@@ -296,7 +313,7 @@ process snpeff_for_HC{
 
 
 	"""
-	/BiO/BioTools/miniconda2/bin/java -Xmx8g -jar /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.jar eff -c /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.config -csvStats snpEff_summary.csv -htmlStats snpEff_summary.html GRCh37.75 output-hc.vcf.gz > output-hc.eff.vcf
+	java -Xmx8g -jar /BiO/BioTools/miniconda3/pkgs/snpeff-4.3-2/share/snpeff-4.3-2/snpEff.jar eff -c /BiO/BioTools/miniconda3/pkgs/snpeff-4.3-2/share/snpeff-4.3-2/snpEff.config -csvStats snpEff_summary.csv -htmlStats snpEff_summary.html GRCh37.75 output-hc.vcf.gz > output-hc.eff.vcf
 	"""
 }
 
@@ -336,6 +353,7 @@ def readPrefix( Path actual, template ) {
 		def prefix = fileName.substring(0,end)
 		while(prefix.endsWith('-') || prefix.endsWith('_') || prefix.endsWith('.') )
 		prefix=prefix[0..-2]
+		
 		return prefix
 	}
 
