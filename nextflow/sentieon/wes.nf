@@ -1,45 +1,13 @@
 #!/usr/bin/env nextflow
 
-/*
----------------------------------------------------------------------------------------
-The pipeline can determine whether the input data is single or paired end. This relies on
-specifying the input files correctly. For paired en data us the example above, i.e.
-'sample_*_{1,2}.fastq.gz'. Without the glob {1,2} (or similiar) the data will be treated
-as single end.
-----------------------------------------------------------------------------------------
- Pipeline overview:
- - Sentieon
-*/
-
 // Pipeline version
 version = 0.1
-
-// Configurable variables
-params.genome = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/seq/GRCh37.fa'
-params.bwa_index = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/bwa/GRCh37.fa'
-params.known_sites = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/variation/Mills_and_1000G_gold_standard.indels.vcf.gz'
-params.dbsnp = '/BiO/BioTools/bcbio/data/genomes/Hsapiens/GRCh37/variation/dbsnp_138.vcf.gz'
-
-params.name = "Sentieon best practice for WES analysis"
-
-// Input reads
-//params.reads = '/BiO/BioPeople/brandon/test_nextflow/wes/example/TN*{R1,R2}_[0-9][0-9][0-9].fastq.gz'
-params.reads = '/BiO/BioPeople/brandon/precisionFDA/NA12878*_{1,2}.fastq.gz'
-
-
-// Output directory
-params.outdir = '/BiO/BioPeople/brandon/test_nextflow/sentieon/outdir'
-
-// Sentieon path and license
-params.sentieon_path = '/BiO/BioTools/sentieon/sentieon-genomics-201606/bin'
-params.sentieon_license = 'export SENTIEON_LICENSE=turtle.ptbio.kr:8990'
 
 log.info "===================================="
 log.info " WES (Sentieon) Best Practice v${version}"
 log.info "===================================="
 log.info "Reads        : ${params.reads}"
-log.info "Genome       : ${params.genome}"
-log.info "Index        : ${params.bwa_index}"
+log.info "Genome       : ${params.bwa_index}"
 log.info "Annotation   : ${params.gtf}"
 log.info "Current home : $HOME"
 log.info "Current user : $USER"
@@ -65,6 +33,7 @@ Channel
         tuple(prefix, path)
     }
     .groupTuple(sort: true)
+    .view()
     .set { read_files }
 
 read_files.into { read_files_fastqc; read_files_mapping }
@@ -74,15 +43,14 @@ read_files.into { read_files_fastqc; read_files_mapping }
  * STEP 1 - FastQC
  */
 process fastqc {
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/sentieon/bin:\$PATH'
 	tag "$prefix"
+
+	cpus params.fastqc.cpus
 
 	memory { 2.GB * task.attempt }
 	time { 4.h * task.attempt }
 
 	errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
-	maxRetries 3
-	maxErrors '-1'
 
 	publishDir "${params.outdir}/$prefix/fastqc", mode: 'copy'
 
@@ -94,7 +62,7 @@ process fastqc {
 	file '*_fastqc.zip' into fastqc_results_zip
 
 	"""
-	fastqc $reads
+	fastqc -t ${params.fastqc.cpus} $reads
 	"""
 }
 
@@ -102,10 +70,8 @@ process fastqc {
  * Step 2. Maps each read-pair by using mapper and sorting
  */
 process mapping {
-	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
-
 	tag "$prefix"
-	cpus 48
+	cpus params.bwa.cpus
 
 	input: 
 	set val(prefix), file (reads:'*') from read_files_mapping
@@ -114,7 +80,7 @@ process mapping {
 	set prefix, file { "sorted.bam" }, file { "sorted.bam.bai" } into bamFiles
 
 	"""
-	bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | sentieon util sort -o sorted.bam -t ${task.cpus} --sam2bam -i -
+	bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${params.bwa.cpus} ${params.bwa_index} $reads | sentieon util sort -o sorted.bam -t ${params.bwa.cpus} --sam2bam -i -
 	"""
 }
 
@@ -124,9 +90,8 @@ bamFiles.into{ bamFiles_metrics; bamFiles_rmdup; }
  * Step 3. metrics for mapping
  */
 process metrics{
-	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
-	cpus 4
+	cpus params.sentieon.cpus
 
 	publishDir "${params.outdir}/$prefix/metrics", mode: 'copy'
 
@@ -137,7 +102,7 @@ process metrics{
 	set file('*.txt') into metrics_txts
 	set file('*.pdf') into metrics_pdf
 	"""
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i sorted.bam --algo MeanQualityByCycle mq_metrics.txt --algo QualDistribution qd_metrics.txt --algo GCBias --summary gc_summary.txt gc_metrics.txt --algo AlignmentStat aln_metrics.txt --algo InsertSizeMetricAlgo is_metrics.txt
+	sentieon driver -r ${params.bwa_index} -t ${params.sentieon.cpus} -i sorted.bam --algo MeanQualityByCycle mq_metrics.txt --algo QualDistribution qd_metrics.txt --algo GCBias --summary gc_summary.txt gc_metrics.txt --algo AlignmentStat aln_metrics.txt --algo InsertSizeMetricAlgo is_metrics.txt
 	sentieon plot metrics -o metrics-report.pdf gc=gc_metrics.txt qd=qd_metrics.txt mq=mq_metrics.txt isize=is_metrics.txt
 	"""
 }
@@ -146,9 +111,8 @@ process metrics{
  * Step 3. Remove PCR duplicates after mapping
  */
 process rmdup{
-	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
-	cpus 4
+	cpus params.sentieon.cpus
 
 	publishDir "${params.outdir}/$prefix/rmdup"
 
@@ -161,18 +125,20 @@ process rmdup{
 	set file('dedup_metrics.txt') into dedupBam_metrics
 
 	"""
-	sentieon driver -t ${task.cpus} -i sorted.bam --algo LocusCollector --fun score_info score.txt
-	sentieon driver -t ${task.cpus} -i sorted.bam --algo Dedup --rmdup --score_info score.txt --metrics dedup_metrics.txt deduped.bam
+	sentieon driver -t ${params.sentieon.cpus} -i sorted.bam --algo LocusCollector --fun score_info score.txt
+	sentieon driver -t ${params.sentieon.cpus} -i sorted.bam --algo Dedup --rmdup --score_info score.txt --metrics dedup_metrics.txt deduped.bam
 	"""
 }
 
 dedupBamFiles.into{ dedupBamFiles_qualimap; dedupBamFiles_realign; }
 
 process qualimap {
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/sentieon/bin:\$PATH'
 	tag "$prefix"
-	cpus 8
-	memory '8 GB'
+	cpus params.qualimap.cpus
+	
+	memory { 4.GB * task.attempt }
+
+	errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
 
 	publishDir "${params.outdir}/${prefix}/qualimap"
 
@@ -188,7 +154,7 @@ process qualimap {
 	file ( "$prefix/qualimapReport.html" ) into qualimap_report_html
 	
 	"""
-	qualimap bamqc --java-mem-size=8G -bam deduped.bam -gd HUMAN -nt ${task.cpus} -outdir $prefix
+	qualimap bamqc --java-mem-size={params.qualimap.memory} -bam deduped.bam -gd HUMAN -nt ${params.qualimap.cpus} -outdir $prefix
 	"""
 }
 
@@ -196,9 +162,8 @@ process qualimap {
  * Step 4. Indel realignment after dedup
  */
 process indelrealign{
-	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
-	cpus 4
+	cpus params.sentieon.cpus
 
 	input:
 	set val(prefix), file('*') from dedupBamFiles_realign
@@ -207,7 +172,7 @@ process indelrealign{
 	set val(prefix), file('realigned.bam*') into realignedBamFiles
 
 	"""
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i deduped.bam --algo Realigner -k ${params.known_sites} realigned.bam
+	sentieon driver -r ${params.bwa_index} -t ${params.sentieon.cpus} -i deduped.bam --algo Realigner -k ${params.known_sites} realigned.bam
 	"""
 }
 
@@ -217,9 +182,8 @@ realignedBamFiles.into { realignedBamFiles_forBaseRecal; realignedBamFiles_UG; r
  * Step 5. Base recalibration after indel realignment 
  */ 
 process baserecal{
-	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
-	cpus 4
+	cpus params.sentieon.cpus
 
 	input:
 	set val(prefix), file('*') from realignedBamFiles_forBaseRecal
@@ -230,9 +194,9 @@ process baserecal{
 	set file('recal_data.table') into baseRecal_table
 
 	"""
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam --algo QualCal -k ${params.dbsnp} -k ${params.known_sites} recal_data.table
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam -q recal_data.table --algo QualCal -k ${params.dbsnp} -k ${params.known_sites} recal_data.table.post
-	sentieon driver -t ${task.cpus} --algo QualCal --plot --before recal_data.table --after recal_data.table.post recal.csv
+	sentieon driver -r ${params.bwa_index} -t ${params.sentieon.cpus} -i realigned.bam --algo QualCal -k ${params.dbsnp} -k ${params.known_sites} recal_data.table
+	sentieon driver -r ${params.bwa_index} -t ${params.sentieon.cpus} -i realigned.bam -q recal_data.table --algo QualCal -k ${params.dbsnp} -k ${params.known_sites} recal_data.table.post
+	sentieon driver -t ${params.sentieon.cpus} --algo QualCal --plot --before recal_data.table --after recal_data.table.post recal.csv
 	sentieon plot bqsr -o recal_plots.pdf recal.csv
 	"""
 }
@@ -243,7 +207,6 @@ baseRecal_table.into{ baseRecal_table_forUG; baseRecal_table_forHC; }
  * Step 6. Variant calling for analysis ready-bam files
  */ 
 process variant_call_UG{
-	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
 	cpus 4
     
@@ -262,9 +225,8 @@ process variant_call_UG{
 }
 
 process variant_call_HC{
-	beforeScript "export PATH=${params.sentieon_path}:\$PATH; ${params.sentieon_license}"
 	tag "$prefix"
-	cpus 4
+	cpus params.sentieon.cpus
 	
 	publishDir "${params.outdir}/$prefix/variant_HC"
 
@@ -276,7 +238,7 @@ process variant_call_HC{
 	set val(prefix), file('output-hc.vcf.gz*') into variant_HC
 
 	"""
-	sentieon driver -r ${params.bwa_index} -t ${task.cpus} -i realigned.bam -q recal_data.table --algo Haplotyper -d ${params.dbsnp} --emit_conf=10 --call_conf=30 --prune_factor=3 output-hc.vcf.gz
+	sentieon driver -r ${params.bwa_index} -t ${params.sentieon.cpus} -i realigned.bam -q recal_data.table --algo Haplotyper -d ${params.dbsnp} --emit_conf=10 --call_conf=30 --prune_factor=3 output-hc.vcf.gz
 	"""
 }
 
@@ -284,8 +246,11 @@ process variant_call_HC{
  * Step 7. Variant annotation
  */
 process snpeff_for_UG{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/sentieon/bin:\$PATH'
 	publishDir "${params.outdir}/$prefix/variant_UG"
+
+	memory { 4.GB * task.attempt }
+
+	errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
 
 	input:
 	set val(prefix), file(vcf:'*') from variant_UG
@@ -300,8 +265,11 @@ process snpeff_for_UG{
 }
 
 process snpeff_for_HC{
-	beforeScript 'export PATH=/BiO/BioTools/miniconda3/envs/sentieon/bin:\$PATH'
 	publishDir "${params.outdir}/$prefix/variant_HC"
+
+	memory { 4.GB * task.attempt }
+
+	errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
 
 	input:
 	set val(prefix), file(vcf:'*') from variant_HC
