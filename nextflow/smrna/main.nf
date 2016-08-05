@@ -252,6 +252,7 @@ process miraligner{
 	file('*.mirna') into mirna_file
 
 	"""
+	export PATH=/BiO/BioPeople/brandon/jre1.7.0_51/bin:$PATH
 	/BiO/BioTools/bcbio/data/anaconda/bin/miraligner -Xms705m -Xmx4500m -freq -sub 1 -trim 3 -add 3 -s ${params.species} -i ${read} -db ${params.db_srnaseq} -o ${prefix}
 	"""
 }
@@ -267,8 +268,10 @@ process miraligner_novel{
 
 	output:
 	val(prefix) into mirna_novel_prefix
-	file('*.mirna') into mirna_novel_file	
+	file('*.mirna') into mirna_novel_file
+
 	"""
+	export PATH=/BiO/BioPeople/brandon/jre1.7.0_51/bin:$PATH
 	/BiO/BioTools/bcbio/data/anaconda/bin/miraligner -Xms705m -Xmx4500m -freq -sub 1 -trim 3 -add 3 -s ${params.species} -i ${read} -db ${novel_db_path} -o ${prefix}_novel
 	"""
 }

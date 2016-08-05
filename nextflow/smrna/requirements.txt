@@ -2,7 +2,9 @@
 # $ conda create --name smrna -c bioconda --file <this file>
 fastqc=0.11.5
 trim-galore=0.4.1
-bcbio-nextgen=0.9.9a0
+bcbio-nextgen=1.0.0a0
+seqcluster
 sambamba=0.6.3
 tdrmapper=1.1
 star=2.5.2a
+bedtools
