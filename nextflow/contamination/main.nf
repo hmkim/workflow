@@ -20,22 +20,21 @@ Channel
 
 
 process mapping {
-    tag "reads: $name"
+	tag "reads: $name"
 
-//    executor 'sge'
-    memory '20 GB'
+	memory '20 GB'
 
-    input:
-    set val(name), file(reads:'*') from read_files
+	input:
+	set val(name), file(reads:'*') from read_files
 
-    output:
-    set val(name), file('sample.kraken') into kraken_output
-    set val(name), file('sample.krona') into krona_input
+	output:
+	set val(name), file('sample.kraken') into kraken_output
+	set val(name), file('sample.krona') into krona_input
 
-    """
-    /BiO/BioTools/bcbio/data/anaconda/bin/kraken --threads ${params.threads} --db ${params.kraken_db} --fastq-input --paired --check-names --output sample.kraken $reads 
-    cut -f2,3 sample.kraken > sample.krona
-    """
+	"""
+	kraken --threads ${params.threads} --db ${params.kraken_db} --fastq-input --paired --check-names --output sample.kraken $reads 
+	cut -f2,3 sample.kraken > sample.krona
+	"""
 }
 
 process make_html{
