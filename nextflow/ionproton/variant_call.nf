@@ -83,6 +83,7 @@ bam = Channel.fromPath( params.bam_folder+'/*.bam' )
 
 process gatk_haplotyper_gvcf {
 	cpus "${params.gatk_cpu}"
+	memory '48 GB'
 
 	tag { prefix }
 
@@ -101,7 +102,7 @@ process gatk_haplotyper_gvcf {
 	file("${bam_tag}_raw_calls.g.vcf.idx") into output_gvcf_idx
 
 	"""
-	gatk -Xmx16g -Djava.io.tmpdir=./ -T HaplotypeCaller -nct ${task.cpus} -R ${fasta_ref} -I ${bam} --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF ${intervals_gvcf} -o ${prefix}.g.vcf
+	gatk -Xmx48g -Djava.io.tmpdir=./ -T HaplotypeCaller -nct ${task.cpus} -R ${fasta_ref} -I ${bam} --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF ${intervals_gvcf} -o ${prefix}.g.vcf
 	"""
 }
 
