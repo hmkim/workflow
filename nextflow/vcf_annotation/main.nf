@@ -1,12 +1,8 @@
-params.in = "/snp/*/*.filter.{hq,lq,mq}.vcf"
-params.out_dir = "/VariantAnnotation/output"
-params.genome_version = "GRCh37.75"
-
 Channel
-        .fromPath( params.in )
-        .ifEmpty { error "Cannot find any reads matching: ${params.in}" }
+        .fromPath( params.in_vcf )
+        .ifEmpty { error "Cannot find any reads matching: ${params.in_vcf}" }
         .map { path ->
-                def prefix = readPrefix(path, params.in)
+                def prefix = readPrefix(path, params.in_vcf)
                 tuple(prefix, path)
         }
         .groupTuple(sort: true)
@@ -18,7 +14,12 @@ vcf_files.into { test1; test2 }
 
 process run_snpeff {
 	publishDir "${params.out_dir}"
- 
+
+	memory { 8.GB * task.attempt } 
+	errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
+        maxRetries 3
+        maxErrors '-1'
+
 	input:
 	set val(prefix), file(vcf:'*') from test1
 
@@ -28,7 +29,7 @@ process run_snpeff {
 	set val(prefix), file("${prefix}.eff.vcf") into snpEff_vcf
 
 	"""
-	/BiO/BioTools/miniconda2/bin/java -Xmx16g -jar /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.jar eff -c /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/snpEff.config ${params.genome_version} ${vcf} > ${prefix}.eff.vcf
+	snpEff -Xmx8g eff ${params.genome_version} ${vcf} > ${prefix}.eff.vcf
 	mv snpEff_genes.txt ${prefix}.snpEff_genes.txt
 	mv snpEff_summary.html ${prefix}.snpEff_summary.html
 	"""
@@ -44,7 +45,7 @@ process extractField{
 	set val(prefix), file("${prefix}.eff.xls") into snpEff_xls
 
 	"""
-	/BiO/BioTools/miniconda2/bin/java -Xmx16g -jar /BiO/BioTools/miniconda2/pkgs/snpeff-4.3-1/share/snpeff-4.3-1/SnpSift.jar extractFields -s , -e . ${vcf} CHROM POS ID REF ALT QUAL "ANN[0].EFFECT" "ANN[0].IMPACT" "ANN[0].GENE" "ANN[0].FEATURE" "GEN[*].GT[*]" "GEN[*].AD[*]"  "GEN[*].DP[*]" "GEN[*].GQ[*]" "GEN[*].PL[*]" "LOF" "NMD" > ${prefix}.eff.xls
+	java -Xmx16g -jar /BiO/BioTools/miniconda3/envs/vcf_annotation/share/snpeff-4.3-2/SnpSift.jar extractFields -s , -e . ${vcf} CHROM POS ID REF ALT QUAL "ANN[0].EFFECT" "ANN[0].IMPACT" "ANN[0].GENE" "ANN[0].FEATURE" "GEN[*].GT[*]" "GEN[*].AD[*]"  "GEN[*].DP[*]" "GEN[*].GQ[*]" "GEN[*].PL[*]" "LOF" "NMD" > ${prefix}.eff.xls
 	"""
 }
 

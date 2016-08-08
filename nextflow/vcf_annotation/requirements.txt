@@ -1,0 +1,3 @@
+# This file may be used to create an environment using:
+# $ conda create --name vcf_annotation -c bioconda --file <this file>
+snpeff

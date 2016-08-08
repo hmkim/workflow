@@ -103,6 +103,7 @@ process mapping {
 
 	output:
 	set prefix, file { "${prefix}.bam" }, file { "${prefix}.bam.bai" } into bamFiles
+	file('*.txt') into dedup_statFiles
 
 	"""
 	bwa mem -M -R '@RG\\tID:${prefix}\\tSM:${prefix}\\tPL:Illumina' -t ${task.cpus} ${params.bwa_index} $reads | /BiO/BioTools/samblaster/samblaster_addMetrics/samblaster --metricsFile ${prefix}.txt | samtools view -u -Sb - | samtools sort - -o ${prefix}.bam
