@@ -1,7 +1,10 @@
 #! /usr/bin/env nextflow
+
 //ref: https://github.com/IARCbioinfo/needlestack/blob/master/needlestack.nf
 
-params.gatk_cpu = 8
+
+// get list of steps from comma-separated strings
+pipelineSteps = params.steps.split(',').collect { it.trim() }
 
 /* If --help in parameters, print software usage */
 
@@ -54,7 +57,7 @@ out_vcf = params.out_vcf ? params.out_vcf : "all_variants.vcf"
 
 /* manage input positions to call (bed or region or whole-genome) */
 
-intervals_gvcf = params.bed ? '-L '+params.bed : ""
+intervals = params.bed ? '-L '+params.bed : ""
 
 if(params.region){
     input_region = 'region'
@@ -74,35 +77,72 @@ log.info '-------------------------------------------------------'
 log.info "Input BAM folder (--bam_folder)                                 : ${params.bam_folder}"
 log.info "Reference in fasta format (--fasta_ref)                         : ${params.fasta_ref}"
 log.info "Intervals for calling (--bed)                                   : ${input_region}"
+log.info "Pipeline steps                                                  : ${pipelineSteps.join(" ")}"
 log.info "output folder (--out_folder)                                    : ${params.out_folder}"
 log.info "\n"
 
-bam = Channel.fromPath( params.bam_folder+'/*.bam' )
+
+
+if ('HaplotypeCaller' in pipelineSteps) {
+	bam = Channel.fromPath( params.bam_folder+'/*.bam' )
 	.map { file -> tuple(file.baseName, file, file + '.bai') }
 
+	process gatk_haplotyper_gvcf {
+		cpus params.gatk.cpus 
+		memory '48 GB'
 
-process gatk_haplotyper_gvcf {
-	cpus "${params.gatk_cpu}"
-	memory '48 GB'
+		tag { prefix }
 
-	tag { prefix }
+		publishDir  params.out_folder+'/gVCF/', mode: 'move'
+	 
+		input:
+		set val(prefix), file(bam), file(bai) from bam
+		
+		file fasta_ref
+		file fasta_ref_fai
+		file fasta_ref_gzi
+		file fasta_ref_dict
 
-	publishDir  params.out_folder+'/gVCF/', mode: 'move'
- 
-	input:
-	set val(prefix), file(bam), file(bai) from bam
-	
-	file fasta_ref
-	file fasta_ref_fai
-	file fasta_ref_gzi
-	file fasta_ref_dict
+		output:
+		file("${bam_tag}_raw_calls.g.vcf") into output_gvcf
+		file("${bam_tag}_raw_calls.g.vcf.idx") into output_gvcf_idx
 
-	output:
-	file("${bam_tag}_raw_calls.g.vcf") into output_gvcf
-	file("${bam_tag}_raw_calls.g.vcf.idx") into output_gvcf_idx
-
-	"""
-	gatk -Xmx48g -Djava.io.tmpdir=./ -T HaplotypeCaller -nct ${task.cpus} -R ${fasta_ref} -I ${bam} --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF ${intervals_gvcf} -o ${prefix}.g.vcf
-	"""
+		"""
+		gatk -Xmx48g -Djava.io.tmpdir=./ -T HaplotypeCaller -nct ${task.cpus} -R ${fasta_ref} -I ${bam} --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF ${intervals} -o ${prefix}.g.vcf
+		"""
+	}
 }
 
+
+if ('UnifiedGenotyper' in pipelineSteps) {
+	bam = Channel.fromPath( params.bam_folder+'/*.bam' )
+	bai = Channel.fromPath( params.bam_folder+'/*.bai' )
+	
+	process gatk_unifiedgenotyper {
+		cpus params.gatk.cpus 
+		memory '48 GB'
+
+		tag { 'joint variant call' }
+
+		publishDir  params.out_folder+'/gVCF/', mode: 'move'
+	 
+		input:
+		set val(read), file(bam:'*') from bam.toList().map{ file -> tuple(file.baseName, file) }
+		file (bai:'*') from bai.toList()
+	
+		file fasta_ref
+		file fasta_ref_fai
+		file fasta_ref_gzi
+		file fasta_ref_dict
+
+		output:
+		//file("${bam_tag}_raw_calls.g.vcf") into output_gvcf
+		//file("${bam_tag}_raw_calls.g.vcf.idx") into output_gvcf_idx
+
+		shell:
+		bam = bam.toString().split().join(" -I ")
+		"""
+		gatk -Xmx48g -Djava.io.tmpdir=./ -T UnifiedGenotyper -nct ${task.cpus} -nt 2 -R ${fasta_ref} -I ${bam} --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 ${intervals} -o join.vcf
+		"""
+	}
+}
