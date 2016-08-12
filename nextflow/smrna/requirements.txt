@@ -9,3 +9,4 @@ tdrmapper=1.1
 star=2.5.2a
 bedtools
 seqbuster=3.1
+viennarna=2.2.7
