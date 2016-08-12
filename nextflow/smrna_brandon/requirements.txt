@@ -1,3 +1,13 @@
 # This file may be used to create an environment using:
-# $ conda create --name smrna_brandon -c biobuilds -c bioconda --file <this file>
+# $ conda create --name smrna_brandon -c biobuilds -c r -c bioconda -c hmkim --file <this file>
+htseq=0.6.1.post1
+cutadapt=1.10
+bioconductor-edger
+mirdeep2
+viennarna
+randfold
 perl-xml-simple=2.22
+trim-galore
+bowtie
+samtools
+picard
