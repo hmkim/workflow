@@ -1,0 +1,5 @@
+# This file may be used to create an environment using:
+# $ conda create --name methylseq -c bioconda --file <this file>
+fastqc
+trim-galore
+multiqc
