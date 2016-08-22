@@ -16,6 +16,7 @@
 ############################################################################
 
 
+library(Cairo)
 
 stdin <- commandArgs(TRUE)
 
@@ -39,7 +40,8 @@ cnt.bytypekeep<-c(cnt.bytypekeep,other)
 names(cnt.bytypekeep) <- newnames
 
 #pdf(paste(output.dir,"/",sample,"_gencode_piechart.pdf",sep=""),width=11,height=8.5)
-png(paste(output.dir,"/",sample,"_gencode_piechart.png",sep=""),width=2400,height=2400,res=300)
+#png(paste(output.dir,"/",sample,"_gencode_piechart.png",sep=""),width=2400,height=2400,res=300)
+CairoPNG (paste(output.dir,"/",sample,"_piechart.png",sep=""), width=2400, height=2400, res=300)
 #par(mar = c(10,6,5,3))
 par(mar=c(0,0,4.1,0))
 pie(cnt.bytypekeep,labels=names(cnt.bytypekeep),main=paste(sample," RNA Quantification",sep=""),cex=0.8)

@@ -11,3 +11,4 @@ trim-galore
 bowtie
 samtools
 picard
+r-cairo=1.5_9
