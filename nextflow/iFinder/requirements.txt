@@ -1,0 +1,7 @@
+# This file may be used to create an environment using:
+# $ conda create --name ifinder -c bioconda --file <this file> python=2.7 anaconda
+samtools
+pysam
+sambamba
+pybedtools
+snpeff
