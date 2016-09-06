@@ -1,13 +1,17 @@
 # This file may be used to create an environment using:
 # $ conda create --name wgs -c bioconda --file <this file>
-bcftools=1.3.1
-bwa=0.7.12
-graphviz=2.38.0
-python=3.5.1
-samtools=1.3.1
-samblaster=0.1.22
-r-ggplot2=2.1.0
-r-gplots=3.0.1
-r-reshape=0.8.5
-r-gsalib=2.1
-snpeff=4.2
+bcftools
+bwa
+graphviz
+samtools
+samblaster
+r-ggplot2
+r-gplots
+r-reshape
+r-gsalib
+snpeff
+trim-galore
+samblaster
+qualimap
+picard
+gatk
