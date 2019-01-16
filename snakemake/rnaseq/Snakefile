@@ -1,6 +1,5 @@
 """
 Author: Hyunmin Kim
-Affiliation: TheragenEtex Bio Institute
 Aim: A simple Snakemake workflow to process paired-end stranded RNA-Seq.
 Date: Mon July 11 17:44:11 KST 2016
 
